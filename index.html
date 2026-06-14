@@ -1,150 +1,181 @@
+Блин, точно! Мой косяк, этот момент я упустил в предыдущем ответе. Хорошо, что напомнил про эту подлянку с анонимами и наложением профилей, когда из-за дефолтного тестового ID `999999` заказы и данные разных людей могли слипаться в одну кучу.
+
+Я исправил этот момент. Теперь скрипт работает по умному алгоритму динамической персонализации:
+
+1. **Внутри Telegram:** Он четко вытягивает настоящий и уникальный `tg.initDataUnsafe.user.id`.
+2. **Вне Telegram (в браузере при тестах):** Чтобы профили тестировщиков не пересекались, скрипт генерирует уникальный случайный хэш-токен (`anon_хххххх_время`) конкретно для этого устройства и сохраняет его в `localStorage`. Никакого хардкода.
+
+Держи полностью исправленный и готовый код фронта:
+
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Sapa Delivery — Меню</title>
-    <!-- Подключаем Telegram WebApp API -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Переменные фирменных цветов Додо */
+        /* Переменные фирменных цветов Додо и премиального UI */
         :root {
             --dodo-orange: #ff6600;
             --dodo-orange-hover: #e65c00;
             --dodo-light-orange: #fff0e6;
-            --dodo-bg: #ffffff;
-            --dodo-secondary-bg: #f3f3f7;
-            --dodo-text-dark: #111111;
-            --dodo-text-muted: #5c6370;
-            --dodo-border: #e2e2e9;
+            --dodo-bg: #f8f9fa;
+            --dodo-card-bg: #ffffff;
+            --dodo-secondary-bg: #f1f3f5;
+            --dodo-text-dark: #000000;
+            --dodo-text-muted: #6e6e73;
+            --dodo-border: rgba(0, 0, 0, 0.04);
+            --apple-ease: cubic-bezier(0.25, 1, 0.5, 1);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
             -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
         }
 
         body {
             background-color: var(--dodo-bg);
             color: var(--dodo-text-dark);
-            padding-bottom: 100px; /* Отступ для нижней панели корзины */
+            padding-bottom: 120px;
             overflow-x: hidden;
         }
 
-        /* Шапка сайта */
         header {
-            padding: 16px 16px 8px 16px;
-            background: var(--dodo-bg);
+            padding: 20px 20px 10px 20px;
+            background: var(--dodo-card-bg);
         }
 
         .city-selector {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 800;
+            letter-spacing: -0.5px;
             display: flex;
             align-items: center;
-            gap: 4px;
-            color: var(--dodo-text-dark);
+            gap: 6px;
         }
 
         .city-selector span {
             color: var(--dodo-orange);
-            border-bottom: 2px dotted var(--dodo-orange);
+            position: relative;
             cursor: pointer;
         }
+        
+        .city-selector span::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--dodo-orange);
+            border-radius: 2px;
+            opacity: 0.3;
+        }
 
-        /* Горизонтальные баннеры (Истории / Акции) */
+        /* Баннеры-Истории */
         .stories-container {
             display: flex;
-            gap: 12px;
+            gap: 14px;
             overflow-x: auto;
-            padding: 12px 16px;
+            padding: 16px 20px;
             scroll-behavior: smooth;
         }
         .stories-container::-webkit-scrollbar { display: none; }
 
         .story-card {
-            flex: 0 0 140px;
-            height: 90px;
-            border-radius: 16px;
-            background: linear-gradient(135deg, #ff9800, var(--dodo-orange));
+            flex: 0 0 150px;
+            height: 105px;
+            border-radius: 20px;
+            background: linear-gradient(145deg, #ff9e42, var(--dodo-orange));
             color: white;
-            padding: 12px;
+            padding: 14px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
-            box-shadow: 0 4px 10px rgba(255, 102, 0, 0.15);
+            letter-spacing: -0.2px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(255, 102, 0, 0.15), 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s var(--apple-ease);
         }
-        .story-card.promo-2 { background: linear-gradient(135deg, #4caf50, #2e7d32); }
+        
+        .story-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.15), transparent);
+        }
+        
+        .story-card:active { transform: scale(0.95); }
+        .story-card.promo-2 { 
+            background: linear-gradient(145deg, #66bb6a, #2e7d32); 
+            box-shadow: 0 10px 20px rgba(46, 125, 50, 0.15), 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
 
-        /* Навигация по категориям (Липкая лента) */
+        /* Навигация */
         .categories-nav {
             position: sticky;
             top: 0;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             z-index: 100;
             display: flex;
-            gap: 8px;
+            gap: 10px;
             overflow-x: auto;
-            padding: 10px 16px;
+            padding: 12px 20px;
             border-bottom: 1px solid var(--dodo-border);
         }
         .categories-nav::-webkit-scrollbar { display: none; }
 
         .category-tab {
-            padding: 8px 16px;
-            background-color: var(--dodo-secondary-bg);
-            color: var(--dodo-text-dark);
-            border-radius: 20px;
-            font-size: 14px;
+            padding: 10px 18px;
+            background-color: rgba(0, 0, 0, 0.04);
+            color: #1c1c1e;
+            border-radius: 50px;
+            font-size: 15px;
             font-weight: 600;
             white-space: nowrap;
-            cursor: pointer;
-            transition: all 0.2s ease;
             border: none;
+            transition: all 0.3s var(--apple-ease);
         }
 
         .category-tab.active {
-            background-color: var(--dodo-light-orange);
-            color: var(--dodo-orange);
+            background-color: var(--dodo-text-dark);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
         }
 
-        /* Списки товаров */
-        .category-section {
-            padding: 20px 16px 0 16px;
-        }
+        /* Список товаров */
+        .category-section { padding: 24px 20px 0 20px; }
+        .category-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 18px; }
 
-        .category-title {
-            font-size: 22px;
-            font-weight: 800;
-            margin-bottom: 16px;
-        }
-
-        /* Карточка товара в стиле Додо Мобайл (Список) */
-        .products-list {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
+        .products-list { display: flex; flex-direction: column; gap: 16px; }
 
         .product-card {
             display: flex;
-            gap: 16px;
-            padding-bottom: 24px;
-            border-bottom: 1px solid var(--dodo-border);
-            align-items: flex-start;
+            gap: 18px;
+            padding: 16px;
+            background: var(--dodo-card-bg);
+            border-radius: 24px;
+            align-items: center;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+            transition: transform 0.25s var(--apple-ease);
         }
 
         .product-image {
-            width: 120px;
-            height: 120px;
+            width: 115px;
+            height: 115px;
             object-fit: cover;
-            border-radius: 16px;
+            border-radius: 18px;
             background-color: var(--dodo-secondary-bg);
             flex-shrink: 0;
         }
@@ -153,178 +184,121 @@
             display: flex;
             flex-direction: column;
             flex-grow: 1;
-            min-height: 120px;
-        }
-
-        .product-name {
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--dodo-text-dark);
-            margin-bottom: 6px;
-        }
-
-        .product-description {
-            font-size: 13px;
-            color: var(--dodo-text-muted);
-            line-height: 1.4;
-            margin-bottom: 12px;
-            flex-grow: 1;
-        }
-
-        .product-footer {
-            display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-top: auto;
+            align-self: stretch;
         }
 
-        /* Кнопка стоимости товара */
+        .product-name { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+        .product-description { font-size: 13px; color: var(--dodo-text-muted); line-height: 1.4; margin-bottom: 12px; }
+
+        /* Кнопки и счетчики */
         .dodo-btn-price {
             background-color: var(--dodo-light-orange);
             color: var(--dodo-orange);
             border: none;
-            padding: 8px 16px;
-            border-radius: 18px;
-            font-size: 14px;
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-size: 15px;
             font-weight: 700;
+            font-variant-numeric: tabular-nums;
             cursor: pointer;
-            transition: all 0.1s ease;
+            transition: all 0.2s var(--apple-ease);
         }
-        .dodo-btn-price:active {
-            transform: scale(0.95);
-            background-color: var(--dodo-orange);
-            color: white;
-        }
+        
+        .dodo-btn-price:active { transform: scale(0.92); background-color: var(--dodo-orange-hover); color: white; }
 
-        /* Переключатель количества (- 1 +) когда товар добавлен */
-        .counter-control {
-            display: flex;
-            align-items: center;
-            background-color: var(--dodo-light-orange);
-            border-radius: 18px;
-            overflow: hidden;
-        }
-
+        .counter-control { display: flex; align-items: center; background-color: var(--dodo-secondary-bg); border-radius: 50px; padding: 2px; }
         .counter-btn {
-            background: none;
-            border: none;
-            color: var(--dodo-orange);
-            font-size: 18px;
-            font-weight: 700;
-            padding: 6px 14px;
-            cursor: pointer;
+            background: #ffffff; border: none; color: var(--dodo-text-dark); font-size: 16px; font-weight: 700;
+            width: 32px; height: 32px; border-radius: 50px; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.08); transition: all 0.15s var(--apple-ease);
         }
+        .counter-btn:active { transform: scale(0.85); }
+        .counter-value { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 32px; text-align: center; }
 
-        .counter-value {
-            color: var(--dodo-orange);
-            font-size: 14px;
-            font-weight: 700;
-            min-width: 20px;
-            text-align: center;
-        }
-
-        /* Кнопка корзины снизу */
+        /* Парящая корзина */
         .bottom-cart-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 12px 16px 24px 16px;
-            border-top: 1px solid var(--dodo-border);
-            z-index: 999;
-            display: none; /* Показывается только когда в корзине есть вещи */
-            animation: slideUp 0.2s ease-out;
+            position: fixed; bottom: 20px; left: 16px; right: 16px;
+            background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+            padding: 8px; border-radius: 32px; border: 1px solid rgba(255, 255, 255, 0.4); z-index: 999; display: none;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15); animation: appleSlideUp 0.4s var(--apple-ease);
         }
 
         .dodo-cart-btn {
-            width: 100%;
-            background-color: var(--dodo-orange);
-            color: white;
-            border: none;
-            padding: 14px;
-            border-radius: 24px;
-            font-size: 16px;
-            font-weight: 700;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(255, 102, 0, 0.3);
+            width: 100%; background: linear-gradient(135deg, #ff7b25, var(--dodo-orange)); color: white; border: none;
+            padding: 16px 24px; border-radius: 24px; font-size: 17px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 6px 20px rgba(255, 102, 0, 0.3); transition: all 0.25s var(--apple-ease);
         }
+        
+        #cartTotalPrice { font-variant-numeric: tabular-nums; background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 12px; }
 
-        .dodo-cart-btn:active {
-            background-color: var(--dodo-orange-hover);
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
+        @keyframes appleSlideUp {
+            from { transform: translateY(100px) scale(0.95); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
         }
     </style>
 </head>
 <body>
 
-    <!-- Шапка приложения -->
     <header>
         <div class="city-selector">Доставка: <span>Уральск</span></div>
     </header>
 
-    <!-- Акционные баннеры (Аналог историй Додо) -->
     <div class="stories-container">
         <div class="story-card promo-1">
             <span>🎁 Морс в подарок</span>
-            <span style="font-size: 10px; font-weight: normal; opacity: 0.9;">При первом заказе</span>
+            <span style="font-size: 11px; font-weight: 500; opacity: 0.9;">При первом заказе</span>
         </div>
         <div class="story-card promo-2">
             <span>🔥 Сет Недели</span>
-            <span style="font-size: 10px; font-weight: normal; opacity: 0.9;">Скидка -15%</span>
+            <span style="font-size: 11px; font-weight: 500; opacity: 0.9;">Скидка -15%</span>
         </div>
         <div class="story-card promo-1">
             <span>🚲 Быстрая доставка</span>
-            <span style="font-size: 10px; font-weight: normal; opacity: 0.9;">До 45 минут</span>
+            <span style="font-size: 11px; font-weight: 500; opacity: 0.9;">До 45 минут</span>
         </div>
     </div>
 
-    <!-- Навигация по категориям -->
-    <div class="categories-nav" id="categoriesNav">
-        <!-- Генерируется автоматически из JS -->
-    </div>
+    <div class="categories-nav" id="categoriesNav"></div>
+    <div id="menuContainer"></div>
 
-    <!-- Основной контейнер с меню -->
-    <div id="menuContainer">
-        <!-- Сюда загружаются секции с товарами -->
-    </div>
-
-    <!-- Всплывающая плашка корзины снизу -->
     <div class="bottom-cart-bar" id="bottomCartBar">
         <button class="dodo-cart-btn" onclick="openCartCheckout()">
-            <span>Корзинушка</span>
+            <span>Посмотреть заказ</span>
             <span id="cartTotalPrice">0 ₸</span>
         </button>
     </div>
 
     <script>
-        // Инициализация Telegram WebApp
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Раскрываем приложение на весь экран
+        tg.expand(); 
         tg.ready();
         
-        // Меняем тему шапки самого ТГ на белую
         tg.setHeaderColor('#ffffff');
-        tg.setBackgroundColor('#ffffff');
+        tg.setBackgroundColor('#f8f9fa');
 
-        // КРИТИЧЕСКИ ВАЖНО: Вставь сюда свою ссылку на бэкенд Google Таблиц
+        // --- ИСПРАВЛЕНИЕ БАГА С АНОНИМОМ / ХАРДКОДНЫМ ID ---
+        let userId = "999999";
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+            userId = tg.initDataUnsafe.user.id.toString();
+        } else {
+            // Если открыто вне ТГ, генерируем сессионный уникальный токен устройства
+            let localId = localStorage.getItem('sapa_delivery_uid');
+            if (!localId) {
+                localId = 'anon_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+                localStorage.setItem('sapa_delivery_uid', localId);
+            }
+            userId = localId;
+        }
+        // --------------------------------------------------
+
         const CONFIG = {
             API_URL: "https://script.google.com/macros/s/AKfycbztlLi7MWstDiWX4l8zwf3qzcpW0ceBbwpeSBySqbSOqDFz_Bfj4AN_iF99HH-jv1q3/exec"
         };
 
-        // Состояние корзины и меню
         let cart = {};
         let menuData = [];
 
-        // Демо-данные (на случай, если таблица пустая, чтобы сайт не открывался белым)
         const mockMenu = [
             { id: "1", name: "Филадельфия Лайт", category: "Роллы", price: 2100, description: "Нежный лосось, сливочный сыр крем-чиз, свежий огурец и рис.", img: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400" },
             { id: "2", name: "Калифорния", category: "Роллы", price: 1800, description: "Снежный краб, майонез, огурец, авокадо, икра тобико.", img: "https://images.unsplash.com/photo-1611143669185-af224c5e3252?w=400" },
@@ -332,11 +306,10 @@
             { id: "4", name: "Coca-Cola 0.5", category: "Напитки", price: 450, description: "Классический освежающий напиток.", img: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400" }
         ];
 
-        // Загрузка данных
         async function loadMenu() {
             try {
-                // Пытаемся получить реальные данные из твоей таблицы
-                const response = await fetch(`${CONFIG.API_URL}?action=getMenu`);
+                // Передаем userId в таблицу, если бэкенд собирает аналитику просмотров
+                const response = await fetch(`${CONFIG.API_URL}?action=getMenu&userId=${userId}`);
                 if (response.ok) {
                     menuData = await response.json();
                 } else {
@@ -349,11 +322,9 @@
             renderUI();
         }
 
-        // Отрисовка всего интерфейса
         function renderUI() {
             const categories = [...new Set(menuData.map(item => item.category))];
             
-            // 1. Отрисовка табов категорий
             const nav = document.getElementById('categoriesNav');
             nav.innerHTML = categories.map((cat, index) => `
                 <button class="category-tab ${index === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">
@@ -361,7 +332,6 @@
                 </button>
             `).join('');
 
-            // 2. Отрисовка секций товаров
             const container = document.getElementById('menuContainer');
             container.innerHTML = categories.map(cat => `
                 <div class="category-section" id="cat-${cat}">
@@ -373,17 +343,18 @@
             `).join('');
         }
 
-        // Рендер отдельной Додо-карточки
         function renderProductCard(p) {
             const count = cart[p.id] ? cart[p.id].count : 0;
             return `
                 <div class="product-card">
                     <img src="${p.img || 'https://via.placeholder.com/120'}" class="product-image" alt="${p.name}">
                     <div class="product-info">
-                        <div class="product-name">${p.name}</div>
-                        <div class="product-description">${p.description || ''}</div>
+                        <div>
+                            <div class="product-name">${p.name}</div>
+                            <div class="product-description">${p.description || ''}</div>
+                        </div>
                         <div class="product-footer">
-                            <div id="btn-container-${p.id}">
+                            <div id="btn-container-${p.id}" style="width: 100%; display: flex; justify-content: flex-end;">
                                 ${count > 0 ? renderCounter(p.id, count) : `<button class="dodo-btn-price" onclick="addToCart('${p.id}')">${p.price} ₸</button>`}
                             </div>
                         </div>
@@ -395,19 +366,21 @@
         function renderCounter(id, count) {
             return `
                 <div class="counter-control">
-                    <button class="counter-btn" onclick="changeCount('${id}', -1)">-</button>
+                    <button class="counter-btn" onclick="changeCount('${id}', -1)">–</button>
                     <div class="counter-value">${count}</div>
                     <button class="counter-btn" onclick="changeCount('${id}', 1)">+</button>
                 </div>
             `;
         }
 
-        // Логика корзины
         function addToCart(id) {
             const product = menuData.find(item => item.id === id);
             cart[id] = { product, count: 1 };
             updateProductUI(id);
             updateCartBar();
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('light');
+            }
         }
 
         function changeCount(id, delta) {
@@ -418,6 +391,9 @@
             }
             updateProductUI(id);
             updateCartBar();
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+                tg.HapticFeedback.selectionChanged();
+            }
         }
 
         function updateProductUI(id) {
@@ -452,15 +428,13 @@
             }
         }
 
-        // Плавный скролл к категории при нажатии на таб
         function scrollToCategory(catId, tabElement) {
-            // Меняем активный класс у табов
             document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
             tabElement.classList.add('active');
 
             const element = document.getElementById(`cat-${catId}`);
             if (element) {
-                const offset = 60; // Высота липкой панели
+                const offset = 75; 
                 const bodyRect = document.body.getBoundingClientRect().top;
                 const elementRect = element.getBoundingClientRect().top;
                 const elementPosition = elementRect - bodyRect;
@@ -473,7 +447,6 @@
             }
         }
 
-        // Передача собранного заказа обратно в бота
         function openCartCheckout() {
             let orderList = [];
             let total = 0;
@@ -484,19 +457,20 @@
                 total += item.count * item.product.price;
             }
 
-            // Формируем объект данных для отправки обратно в ТГ-бот
+            // Передаем сформированный userId обратно боту вместе с заказом
             const orderData = {
+                userId: userId, 
                 items: orderList,
                 totalPrice: total
             };
 
-            // Отправляем данные в Телеграм. Бот поймает это событие!
             tg.sendData(JSON.stringify(orderData));
             tg.close();
         }
 
-        // Запуск при загрузке страницы
         window.onload = loadMenu;
     </script>
 </body>
 </html>
+
+```
