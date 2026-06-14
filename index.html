@@ -3,558 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sapa Delivery — Меню</title>
+    <title>Sapa Delivery</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Переменные фирменных цветов Додо и премиального UI */
         :root {
             --dodo-orange: #ff6600;
-            --dodo-orange-hover: #e65c00;
-            --dodo-light-orange: #fff0e6;
             --dodo-bg: #f8f9fa;
-            --dodo-card-bg: #ffffff;
-            --dodo-secondary-bg: #f1f3f5;
             --dodo-text-dark: #000000;
             --dodo-text-muted: #6e6e73;
             --dodo-border: rgba(0, 0, 0, 0.04);
-            --apple-ease: cubic-bezier(0.25, 1, 0.5, 1);
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        body {
-            background-color: var(--dodo-bg);
-            color: var(--dodo-text-dark);
-            padding-bottom: 120px;
-            overflow-x: hidden;
-        }
-
-        header {
-            padding: 20px 20px 10px 20px;
-            background: var(--dodo-card-bg);
-        }
-
-        .city-selector {
-            font-size: 22px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .city-selector span {
-            color: var(--dodo-orange);
-            position: relative;
-            cursor: pointer;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+        body { background-color: var(--dodo-bg); padding-bottom: 80px; }
         
-        .city-selector span::after {
-            content: '';
-            position: absolute;
-            bottom: 2px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: var(--dodo-orange);
-            border-radius: 2px;
-            opacity: 0.3;
-        }
+        header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; background: white; }
+        .logo-container img { height: 35px; }
+        .user-profile { text-align: right; }
+        .user-name { font-weight: 700; font-size: 14px; }
+        .user-points { font-size: 12px; color: var(--dodo-orange); font-weight: 600; }
 
-        /* Динамические Баннеры (Hero section) */
-        .stories-container {
-            display: flex;
-            gap: 14px;
-            overflow-x: auto;
-            padding: 16px 20px;
-            scroll-behavior: smooth;
-        }
+        .stories-container { display: flex; gap: 14px; overflow-x: auto; padding: 16px 20px; }
         .stories-container::-webkit-scrollbar { display: none; }
+        .story-card { flex: 0 0 170px; height: 115px; border-radius: 20px; background-size: cover; background-position: center; padding: 14px; color: white; display: flex; flex-direction: column; justify-content: flex-end; cursor: pointer; }
 
-        .story-card {
-            flex: 0 0 170px;
-            height: 115px;
-            border-radius: 20px;
-            background: linear-gradient(145deg, #ff9e42, var(--dodo-orange));
-            background-size: cover;
-            background-position: center;
-            color: white;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: -0.2px;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 8px 20px rgba(255, 102, 0, 0.12), 0 4px 6px rgba(0, 0, 0, 0.04);
-            transition: transform 0.3s var(--apple-ease), box-shadow 0.3s ease;
-            cursor: pointer;
-        }
-        
-        /* Затемнение картинки баннера для читаемости текста */
-        .story-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.55));
-            z-index: 1;
-        }
+        .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: white; display: flex; border-top: 1px solid var(--dodo-border); z-index: 1000; }
+        .tab-item { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--dodo-text-muted); cursor: pointer; }
+        .tab-item.active { color: var(--dodo-orange); }
 
-        .story-card * {
-            position: relative;
-            z-index: 2;
-            text-shadow: 0 1px 4px rgba(0,0,0,0.4);
-        }
-        
-        .story-card:active { transform: scale(0.95); }
-
-        /* Навигация */
-        .categories-nav {
-            position: sticky;
-            top: 0;
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            z-index: 100;
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding: 12px 20px;
-            border-bottom: 1px solid var(--dodo-border);
-        }
-        .categories-nav::-webkit-scrollbar { display: none; }
-
-        .category-tab {
-            padding: 10px 18px;
-            background-color: rgba(0, 0, 0, 0.04);
-            color: #1c1c1e;
-            border-radius: 50px;
-            font-size: 15px;
-            font-weight: 600;
-            white-space: nowrap;
-            border: none;
-            transition: all 0.3s var(--apple-ease);
-        }
-
-        .category-tab.active {
-            background-color: var(--dodo-text-dark);
-            color: #ffffff;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-        }
-
-        /* Список товаров */
-        .category-section { padding: 24px 20px 0 20px; }
-        .category-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 18px; }
-
-        .products-list { display: flex; flex-direction: column; gap: 16px; }
-
-        .product-card {
-            display: flex;
-            gap: 18px;
-            padding: 16px;
-            background: var(--dodo-card-bg);
-            border-radius: 24px;
-            align-items: center;
-            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
-            transition: transform 0.25s var(--apple-ease), background-color 0.4s ease;
-        }
-
-        /* Эффект подсветки при клике на баннер */
-        .product-card.highlight-flash {
-            background-color: #fff4eb;
-            transform: scale(1.02);
-            border: 1px solid rgba(255,102,0,0.2);
-        }
-
-        .product-image {
-            width: 115px;
-            height: 115px;
-            object-fit: cover;
-            border-radius: 18px;
-            background-color: var(--dodo-secondary-bg);
-            flex-shrink: 0;
-        }
-
-        .product-info {
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1;
-            justify-content: space-between;
-            align-self: stretch;
-        }
-
-        .product-name { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
-        .product-description { font-size: 13px; color: var(--dodo-text-muted); line-height: 1.4; margin-bottom: 12px; }
-
-        /* Кнопки и счетчики */
-        .dodo-btn-price {
-            background-color: var(--dodo-light-orange);
-            color: var(--dodo-orange);
-            border: none;
-            padding: 8px 20px;
-            border-radius: 50px;
-            font-size: 15px;
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            cursor: pointer;
-            transition: all 0.2s var(--apple-ease);
-        }
-        
-        .dodo-btn-price:active { transform: scale(0.92); background-color: var(--dodo-orange-hover); color: white; }
-
-        .counter-control { display: flex; align-items: center; background-color: var(--dodo-secondary-bg); border-radius: 50px; padding: 2px; }
-        .counter-btn {
-            background: #ffffff; border: none; color: var(--dodo-text-dark); font-size: 16px; font-weight: 700;
-            width: 32px; height: 32px; border-radius: 50px; display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.08); transition: all 0.15s var(--apple-ease);
-        }
-        .counter-btn:active { transform: scale(0.85); }
-        .counter-value { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 32px; text-align: center; }
-
-        /* Парящая корзина */
-        .bottom-cart-bar {
-            position: fixed; bottom: 20px; left: 16px; right: 16px;
-            background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
-            padding: 8px; border-radius: 32px; border: 1px solid rgba(255, 255, 255, 0.4); z-index: 999; display: none;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15); animation: appleSlideUp 0.4s var(--apple-ease);
-        }
-
-        .dodo-cart-btn {
-            width: 100%; background: linear-gradient(135deg, #ff7b25, var(--dodo-orange)); color: white; border: none;
-            padding: 16px 24px; border-radius: 24px; font-size: 17px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 6px 20px rgba(255, 102, 0, 0.3); transition: all 0.25s var(--apple-ease);
-        }
-        
-        #cartTotalPrice { font-variant-numeric: tabular-nums; background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 12px; }
-
-        @keyframes appleSlideUp {
-            from { transform: translateY(100px) scale(0.95); opacity: 0; }
-            to { transform: translateY(0) scale(1); opacity: 1; }
-        }
+        .menu-section { padding: 20px; }
+        .product-card { background: white; border-radius: 20px; padding: 16px; margin-bottom: 12px; display: flex; gap: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+        .product-image { width: 100px; height: 100px; border-radius: 15px; object-fit: cover; }
+        .product-info { flex: 1; }
+        .price-btn { background: #fff0e6; color: var(--dodo-orange); padding: 8px 15px; border-radius: 20px; font-weight: 700; border: none; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="city-selector">Доставка: <span>Уральск</span></div>
-    </header>
-
-    <div class="stories-container" id="bannersContainer">
-        <div style="color: var(--dodo-text-muted); font-size: 13px; padding: 10px;">Загрузка акций...</div>
+<header>
+    <div class="logo-container" id="logoBox"></div>
+    <div class="user-profile">
+        <div class="user-name" id="userName">Гость</div>
+        <div class="user-points" id="userPoints">0 баллов</div>
     </div>
+</header>
 
-    <div class="categories-nav" id="categoriesNav"></div>
-    <div id="menuContainer">
-        <div style="text-align: center; padding: 40px; color: var(--dodo-text-muted);">Синхронизация меню с таблицей...</div>
-    </div>
+<div class="stories-container" id="bannersContainer"></div>
 
-    <div class="bottom-cart-bar" id="bottomCartBar">
-        <button class="dodo-cart-btn" onclick="openCartCheckout()">
-            <span>Посмотреть заказ</span>
-            <span id="cartTotalPrice">0 ₸</span>
-        </button>
-    </div>
+<div id="menuContainer" class="menu-section"></div>
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand(); 
-        tg.ready();
-        
-        tg.setHeaderColor('#ffffff');
-        tg.setBackgroundColor('#f8f9fa');
+<div class="tab-bar">
+    <div class="tab-item active" onclick="switchTab(this)">Меню</div>
+    <div class="tab-item" onclick="location.href='#'">Мои заказы</div>
+</div>
 
-        // Получение или генерация ID пользователя
-        let userId = "anon";
-        let userName = "Гость";
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            userId = tg.initDataUnsafe.user.id.toString();
-            userName = tg.initDataUnsafe.user.first_name || "Пользователь";
-        } else {
-            let localId = localStorage.getItem('sapa_delivery_uid');
-            if (!localId) {
-                localId = 'anon_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
-                localStorage.setItem('sapa_delivery_uid', localId);
-            }
-            userId = localId;
-        }
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    
+    let menuData = [];
 
-        const CONFIG = {
-            API_URL: "https://script.google.com/macros/s/AKfycbztlLi7MWstDiWX4l8zwf3qzcpW0ceBbwpeSBySqbSOqDFz_Bfj4AN_iF99HH-jv1q3/exec"
-        };
-
-        let cart = {};
-        let menuData = [];
-        let bannersData = [];
-        let userProfile = {};
-
-        // Фолбэк-данные на случай сбоя сети
-        const mockMenu = [
-            { id: "S1", name: "Филадельфия Лайт", category: "Роллы", price: 2100, description: "Лосось, сливочный сыр крем-чиз, свежий огурец и рис.", imageUrl: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400" },
-            { id: "S2", name: "Калифорния", category: "Роллы", price: 1800, description: "Снежный краб, майонез, огурец, авокадо, икра тобико.", imageUrl: "https://images.unsplash.com/photo-1611143669185-af224c5e3252?w=400" }
-        ];
-        const mockBanners = [
-            { id: "B1", type: "product", title: "Филадельфия", description: "Хит недели со скидкой", imageUrl: "", targetId: "S1" }
-        ];
-
-        // Основная функция загрузки всех данных через новый универсальный эндпоинт
-        async function loadInitialData() {
-            try {
-                const url = `${CONFIG.API_URL}?action=getInitialData&tgId=${userId}&name=${encodeURIComponent(userName)}`;
-                const response = await fetch(url);
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.success) {
-                        menuData = result.menu || [];
-                        bannersData = result.banners || [];
-                        userProfile = result.user || {};
-                    } else {
-                        throw new Error(result.error || "Ошибка структуры");
-                    }
-                } else {
-                    throw new Error("Ошибка ответа сервера");
-                }
-            } catch (e) {
-                console.error("Используем демо-данные из-за ошибки:", e);
-                menuData = mockMenu;
-                bannersData = mockBanners;
-            }
+    async function loadData() {
+        try {
+            // Укажи свой URL
+            const resp = await fetch("https://script.google.com/macros/s/AKfycbztlLi7MWstDiWX4l8zwf3qzcpW0ceBbwpeSBySqbSOqDFz_Bfj4AN_iF99HH-jv1q3/exec");
+            const data = await resp.json();
             
-            renderBanners();
-            renderUI();
-        }
-
-        // Рендеринг динамических баннеров Hero-section из таблицы
-        function renderBanners() {
-            const container = document.getElementById('bannersContainer');
-            if (!bannersData || bannersData.length === 0) {
-                container.style.display = 'none';
-                return;
-            }
-
-            container.innerHTML = bannersData.map(banner => {
-                // Если указана картинка, ставим её на фон
-                const bgStyle = banner.imageUrl 
-                    ? `style="background-image: url('${banner.imageUrl}');"` 
-                    : `style="background: linear-gradient(145deg, #ff9e42, var(--dodo-orange));"`;
-
-                return `
-                    <div class="story-card" ${bgStyle} onclick="handleBannerClick('${banner.targetId}')">
-                        <div>
-                            <div class="banner-title">${banner.title}</div>
-                            <div style="font-size: 11px; font-weight: 500; opacity: 0.9; margin-top: 4px;">${banner.description}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // Обработчик умного клика на баннер (скролл к товару или категории)
-        function handleBannerClick(target) {
-            if (!target) return;
-            const cleanedTarget = target.trim().toUpperCase();
-
-            if (window.Telegram?.WebApp?.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('medium');
-            }
-
-            // 1. Проверяем, является ли таргет ID конкретного товара (например, S1, S2)
-            const productElement = document.getElementById(`product-card-${cleanedTarget}`);
-            if (productElement) {
-                const offset = 120;
-                const bodyRect = document.body.getBoundingClientRect().top;
-                const elementRect = productElement.getBoundingClientRect().top;
-                const offsetPosition = (elementRect - bodyRect) - offset;
-
-                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
-
-                // Добавляем красивый визуальный фокус-эффект на карточку
-                productElement.classList.add('highlight-flash');
-                setTimeout(() => productElement.classList.remove('highlight-flash'), 1500);
-                return;
-            }
-
-            // 2. Если товар не найден, проверяем, вдруг это имя категории (например, Роллы, Напитки)
-            const categoryElement = document.getElementById(`cat-${target.trim()}`);
-            if (categoryElement) {
-                const offset = 75;
-                const bodyRect = document.body.getBoundingClientRect().top;
-                const elementRect = categoryElement.getBoundingClientRect().top;
-                const offsetPosition = (elementRect - bodyRect) - offset;
-
-                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
-                
-                // Переключаем активный таб в навигации
-                document.querySelectorAll('.category-tab').forEach(tab => {
-                    if (tab.innerText.trim() === target.trim()) {
-                        document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
-                        tab.classList.add('active');
-                    }
-                });
-            }
-        }
-
-        // Рендеринг меню и категорий
-        function renderUI() {
-            if (!menuData || menuData.length === 0) {
-                document.getElementById('menuContainer').innerHTML = `<div style="text-align: center; padding: 40px; color: var(--dodo-text-muted);">В данный момент меню пусто.</div>`;
-                return;
-            }
-
-            const categories = [...new Set(menuData.map(item => item.category))];
+            // Логотип
+            document.getElementById('logoBox').innerHTML = `<img src="${data.logoUrl}" alt="Logo">`;
+            // Пользователь
+            document.getElementById('userName').innerText = data.user.name;
+            document.getElementById('userPoints').innerText = data.user.points + " баллов";
             
-            const nav = document.getElementById('categoriesNav');
-            nav.innerHTML = categories.map((cat, index) => `
-                <button class="category-tab ${index === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">
-                    ${cat}
-                </button>
-            `).join('');
+            menuData = data.menu;
+            renderMenu();
+        } catch(e) { console.error("Ошибка загрузки"); }
+    }
 
-            const container = document.getElementById('menuContainer');
-            container.innerHTML = categories.map(cat => `
-                <div class="category-section" id="cat-${cat}">
-                    <div class="category-title">${cat}</div>
-                    <div class="products-list">
-                        ${menuData.filter(item => item.category === cat).map(product => renderProductCard(product)).join('')}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function renderProductCard(p) {
-            const count = cart[p.id] ? cart[p.id].count : 0;
-            return `
-                <div class="product-card" id="product-card-${p.id}">
-                    <img src="${p.imageUrl || 'https://via.placeholder.com/120'}" class="product-image" alt="${p.name}">
+    function renderMenu() {
+        const container = document.getElementById('menuContainer');
+        container.innerHTML = menuData
+            .filter(item => item.isAvailable === "TRUE")
+            .map(p => `
+                <div class="product-card">
+                    <img src="${p.imageUrl}" class="product-image">
                     <div class="product-info">
-                        <div>
-                            <div class="product-name">${p.name}</div>
-                            <div class="product-description">${p.description || ''}</div>
-                        </div>
-                        <div class="product-footer">
-                            <div id="btn-container-${p.id}" style="width: 100%; display: flex; justify-content: flex-end;">
-                                ${count > 0 ? renderCounter(p.id, count) : `<button class="dodo-btn-price" onclick="addToCart('${p.id}')">${p.price} ₸</button>`}
-                            </div>
-                        </div>
+                        <h3>${p.name}</h3>
+                        <p>${p.description}</p>
+                        <button class="price-btn">${p.price} ₸</button>
                     </div>
                 </div>
-            `;
-        }
+            `).join('');
+    }
 
-        function renderCounter(id, count) {
-            return `
-                <div class="counter-control">
-                    <button class="counter-btn" onclick="changeCount('${id}', -1)">–</button>
-                    <div class="counter-value">${count}</div>
-                    <button class="counter-btn" onclick="changeCount('${id}', 1)">+</button>
-                </div>
-            `;
-        }
-
-        function addToCart(id) {
-            const product = menuData.find(item => item.id === id);
-            cart[id] = { product, count: 1 };
-            updateProductUI(id);
-            updateCartBar();
-            if (window.Telegram?.WebApp?.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('light');
-            }
-        }
-
-        function changeCount(id, delta) {
-            if (!cart[id]) return;
-            cart[id].count += delta;
-            if (cart[id].count <= 0) {
-                delete cart[id];
-            }
-            updateProductUI(id);
-            updateCartBar();
-            if (window.Telegram?.WebApp?.HapticFeedback) {
-                tg.HapticFeedback.selectionChanged();
-            }
-        }
-
-        function updateProductUI(id) {
-            const container = document.getElementById(`btn-container-${id}`);
-            if (!container) return;
-            
-            if (cart[id]) {
-                container.innerHTML = renderCounter(id, cart[id].count);
-            } else {
-                const product = menuData.find(item => item.id === id);
-                container.innerHTML = `<button class="dodo-btn-price" onclick="addToCart('${id}')">${product.price} ₸</button>`;
-            }
-        }
-
-        function updateCartBar() {
-            const bar = document.getElementById('bottomCartBar');
-            const priceText = document.getElementById('cartTotalPrice');
-            
-            let totalItems = 0;
-            let totalPrice = 0;
-            
-            for (let id in cart) {
-                totalItems += cart[id].count;
-                totalPrice += cart[id].count * cart[id].product.price;
-            }
-            
-            if (totalItems > 0) {
-                bar.style.display = 'block';
-                priceText.innerText = `${totalPrice} ₸`;
-            } else {
-                bar.style.display = 'none';
-            }
-        }
-
-        function scrollToCategory(catId, tabElement) {
-            document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
-            tabElement.classList.add('active');
-
-            const element = document.getElementById(`cat-${catId}`);
-            if (element) {
-                const offset = 75; 
-                const bodyRect = document.body.getBoundingClientRect().top;
-                const elementRect = element.getBoundingClientRect().top;
-                const offsetPosition = (elementRect - bodyRect) - offset;
-
-                window.scrollTo({
-                    top: offsetPosition,
-                    behavior: 'smooth'
-                });
-            }
-        }
-
-        function openCartCheckout() {
-            let orderList = [];
-            let total = 0;
-            
-            for (let id in cart) {
-                const item = cart[id];
-                orderList.push(`${item.product.name} x${item.count}`);
-                total += item.count * item.product.price;
-            }
-
-            const orderData = {
-                userId: userId, 
-                items: orderList,
-                totalPrice: total
-            };
-
-            tg.sendData(JSON.stringify(orderData));
-            tg.close();
-        }
-
-        // Запуск инициализации при полной загрузке страницы
-        window.onload = loadInitialData;
-    </script>
+    window.onload = loadData;
+</script>
 </body>
 </html>
