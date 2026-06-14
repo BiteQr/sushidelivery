@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Sapa Delivery | Премиум Доставка</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    /* Плавный горизонтальный скроллбаровыключатель */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-sans min-h-full flex flex-col select-none pb-24">
+
+  <script>
+    const CONFIG = {
+      API_URL: "https://script.google.com/macros/s/AKfycbztlLi7MWstDiWX4l8zwf3qzcpW0ceBbwpeSBySqbSOqDFz_Bfj4AN_iF99HH-jv1q3/exec", // Вставьте сюда URL вашего развернутого Web App (типа https://script.google.com/.../exec)
+      MIN_ITEMS_FOR_COMBO: 2,                     // Минимум товаров для применения Авто-Комбо скидки
+      COMBO_DISCOUNT: 1000,                       // Размер скидки в тенге за комбо
+      CASHBACK_PERCENT: 10,                       // Процент кэшбека
+      KASPI_PHONE: "+7 777 215 58 37",            // Номер для перевода Kaspi
+      KASPI_RECEIVER: "Алишер Н."                 // Имя получателя перевода
+    };
+  </script>
+
+  <header class="bg-zinc-900/80 backdrop-blur-md sticky top-0 z-40 border-b border-zinc-800 px-4 py-3 flex justify-between items-center">
+    <div>
+      <h1 class="text-xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">SAPA DELIVERY</h1>
+      <p class="text-[10px] text-zinc-400 font-medium tracking-widest uppercase">Dark Kitchen Uralsk</p>
+    </div>
+    <div class="bg-zinc-800/80 border border-zinc-700/60 rounded-full px-3 py-1 flex items-center gap-1.5 shadow-lg">
+      <span class="text-amber-400 text-xs font-bold" id="user-bonuses">0</span>
+      <span class="text-[10px] uppercase font-black text-zinc-400 tracking-wider">₸</span>
+    </div>
+  </header>
+
+  <main class="flex-1 px-4 py-4 max-w-md mx-auto w-full">
+    
+    <section id="tab-menu" class="space-y-6">
+      <div id="banners-container" class="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory">
+        <div class="w-full shrink-0 animate-pulse bg-zinc-900 h-36 rounded-2xl border border-zinc-800"></div>
+      </div>
+
+      <div id="tags-container" class="flex gap-2 overflow-x-auto no-scrollbar py-1">
+        <button onclick="filterByTag('Все')" class="tag-btn shrink-0 bg-amber-500 text-zinc-950 px-4 py-2 rounded-full text-xs font-extrabold shadow-md transition-all">Все меню</button>
+        </div>
+
+      <div id="products-grid" class="grid grid-cols-2 gap-3.5">
+        <div class="bg-zinc-900 h-48 rounded-2xl animate-pulse border border-zinc-800"></div>
+        <div class="bg-zinc-900 h-48 rounded-2xl animate-pulse border border-zinc-800"></div>
+      </div>
+    </section>
+
+    <section id="tab-orders" class="hidden space-y-6">
+      <div id="tracking-widget" class="hidden bg-gradient-to-br from-zinc-900 to-zinc-950 border border-amber-500/40 rounded-2xl p-4 shadow-2xl">
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-xs uppercase tracking-wider font-bold text-amber-400">Отслеживание заказа</span>
+          <span class="text-xs font-black text-zinc-300" id="track-order-id">#SP-0000</span>
+        </div>
+        <div class="relative w-full bg-zinc-800 h-2 rounded-full overflow-hidden mb-4">
+          <div id="track-progress" class="absolute top-0 left-0 bg-gradient-to-r from-amber-400 to-orange-500 h-full w-1/3 transition-all duration-500"></div>
+        </div>
+        <div class="flex justify-between text-[10px] font-black uppercase text-zinc-400 tracking-wider">
+          <span id="step-new" class="text-amber-400">Принят</span>
+          <span id="step-cooking">Готовится</span>
+          <span id="step-delivery">В пути</span>
+        </div>
+        <div class="mt-3 text-center bg-zinc-900/60 rounded-xl py-2 border border-zinc-800/80">
+          <p class="text-xs font-semibold text-zinc-300" id="track-status-text">Статус: Новый</p>
+        </div>
+      </div>
+
+      <h3 class="text-sm font-bold tracking-widest text-zinc-400 uppercase">История заказов</h3>
+      <div id="orders-history-list" class="space-y-3">
+        <p class="text-xs text-zinc-500 text-center py-8">История пуста или загружается...</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="cart-sheet" class="fixed inset-x-0 bottom-0 z-50 bg-zinc-900 border-t border-zinc-800 rounded-t-3xl translate-y-full transition-transform duration-300 max-w-md mx-auto shadow-2xl flex flex-col max-h-[85vh]">
+    <div class="w-full flex justify-center py-3 cursor-pointer" onclick="toggleCart(false)">
+      <div class="w-12 h-1 bg-zinc-700 rounded-full"></div>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto px-5 pb-6 space-y-5 no-scrollbar">
+      <h2 class="text-lg font-black text-white tracking-wide">Ваш заказ</h2>
+      <div id="cart-items-list" class="space-y-3 divide-y divide-zinc-800/50">
+        </div>
+
+      <div id="combo-alert" class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-400 flex items-center justify-between hidden">
+        <span>🔥 Активировано Авто-Комбо скидка!</span>
+        <span class="font-bold">-${CONFIG.COMBO_DISCOUNT} ₸</span>
+      </div>
+
+      <div class="bg-zinc-950 p-3 rounded-xl border border-zinc-800 space-y-2">
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-zinc-400">Доступно бонусов (макс 30% от чека):</span>
+          <span class="font-bold text-amber-400" id="cart-available-bonuses">0 ₸</span>
+        </div>
+        <div class="flex gap-2">
+          <input type="number" id="bonus-input" placeholder="Сколько списать?" oninput="recalculateTotalPrice()" class="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs w-full text-white focus:outline-none focus:border-amber-500" />
+          <button onclick="applyMaxBonuses()" class="bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-[10px] uppercase px-3 rounded-lg border border-zinc-700">Макс</button>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <input type="text" id="order-name" placeholder="Ваше Имя" class="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs w-full text-white focus:outline-none focus:border-amber-500" />
+        <input type="tel" id="order-phone" placeholder="Телефон (например: 77051234567)" class="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs w-full text-white focus:outline-none focus:border-amber-500" />
+        <input type="text" id="order-address" placeholder="Адрес доставки (Уральск, улица, дом, квартира)" class="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs w-full text-white focus:outline-none focus:border-amber-500" />
+      </div>
+
+      <div class="space-y-2">
+        <label class="text-xs font-bold text-zinc-400 uppercase tracking-wider block">Способ оплаты</label>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="pay-kaspi" onclick="setPaymentMethod('Kaspi Перевод')" class="border border-amber-500 bg-amber-500/10 text-amber-400 rounded-xl py-3 text-xs font-bold transition-all">Kaspi Перевод</button>
+          <button id="pay-cash" onclick="setPaymentMethod('Наличные')" class="border border-zinc-800 bg-zinc-950 text-zinc-400 rounded-xl py-3 text-xs font-semibold transition-all">Наличные курьеру</button>
+        </div>
+        
+        <div id="kaspi-details-block" class="bg-zinc-950 border border-zinc-800 rounded-xl p-3.5 space-y-2">
+          <p class="text-[11px] text-zinc-400 leading-relaxed">Для оплаты совершите перевод в приложении Kaspi на номер:</p>
+          <div class="flex items-center justify-between bg-zinc-900 px-3 py-2 rounded-lg border border-zinc-800">
+            <span class="text-xs font-bold text-white tracking-wide" id="kaspi-phone-text"></span>
+            <button onclick="copyKaspiPhone()" class="bg-amber-500 hover:bg-amber-600 text-zinc-950 text-[10px] font-black uppercase px-2.5 py-1 rounded-md transition-colors shadow">Скопировать</button>
+          </div>
+          <p class="text-[10px] text-zinc-500">Получатель: <span class="text-zinc-300 font-semibold" id="kaspi-name-text"></span></p>
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-zinc-800 space-y-3">
+        <div class="space-y-1.5 text-xs text-zinc-400">
+          <div class="flex justify-between"><span>Сумма блюд:</span><span id="price-subtotal">0 ₸</span></div>
+          <div class="flex justify-between text-rose-400 hidden" id="row-discount"><span>Скидка Авто-Комбо:</span><span id="price-discount">-0 ₸</span></div>
+          <div class="flex justify-between text-emerald-400 hidden" id="row-bonuses"><span>Списание бонусов:</span><span id="price-bonuses">-0 ₸</span></div>
+          <div class="flex justify-between text-zinc-200 font-extrabold text-sm pt-1 border-t border-zinc-800/60 mt-1"><span>Итого к оплате:</span><span class="text-amber-400 text-base" id="price-final">0 ₸</span></div>
+        </div>
+        
+        <button id="btn-submit-order" onclick="submitOrder()" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-zinc-950 font-black text-sm py-4 rounded-xl shadow-xl transition-all active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none uppercase tracking-wider flex justify-center items-center gap-2">
+          <span>Подтвердить заказ</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="sticky-cart-trigger" class="fixed bottom-20 inset-x-4 z-30 max-w-md mx-auto transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none">
+    <button onclick="toggleCart(true)" class="w-full bg-amber-500 text-zinc-950 font-black py-4 rounded-xl shadow-2xl flex justify-between items-center px-5 animate-bounce">
+      <div class="flex items-center gap-2">
+        <span class="text-sm uppercase tracking-wider">Посмотреть корзину</span>
+        <span class="bg-zinc-950 text-amber-400 text-[10px] px-2 py-0.5 rounded-full font-black" id="sticky-cart-count">0</span>
+      </div>
+      <span class="text-base font-black" id="sticky-cart-total">0 ₸</span>
+    </button>
+  </div>
+
+  <nav class="fixed bottom-0 inset-x-0 bg-zinc-900/90 backdrop-blur-md border-t border-zinc-800 z-40 max-w-md mx-auto flex h-16 shadow-2xl">
+    <button id="nav-menu" onclick="switchTab('menu')" class="flex-1 flex flex-col justify-center items-center text-amber-500 font-bold text-xs gap-0.5">
+      <span class="text-lg">🍱</span>
+      <span>Меню</span>
+    </button>
+    <button id="nav-orders" onclick="switchTab('orders')" class="flex-1 flex flex-col justify-center items-center text-zinc-500 font-semibold text-xs gap-0.5">
+      <span class="text-lg">📋</span>
+      <span>Мои Заказы</span>
+    </button>
+  </nav>
+
+  <script>
+    // Инициализация глобального состояния приложения
+    let state = {
+      tgId: "anon_" + Math.floor(100000 + Math.random() * 900000),
+      userName: "Гость",
+      menu: [],
+      banners: [],
+      userProfile: { bonuses: 0, phone: "" },
+      cart: {}, // формат { id_товара: количество }
+      currentTag: "Все",
+      selectedPaymentMethod: "Kaspi Перевод"
+    };
+
+    // Проверка ТГ-параметров авторизации и защита личных кабинетов в localStorage
+    function initAuthentication() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tgIdParam = urlParams.get('tgId');
+      const nameParam = urlParams.get('name');
+      
+      if (tgIdParam) {
+        state.tgId = tgIdParam;
+        state.userName = nameParam || "Пользователь";
+        localStorage.setItem('sapa_tgId', state.tgId);
+        localStorage.setItem('sapa_name', state.userName);
+      } else {
+        const cachedTgId = localStorage.getItem('sapa_tgId');
+        const cachedName = localStorage.getItem('sapa_name');
+        if (cachedTgId) {
+          state.tgId = cachedTgId;
+          state.userName = cachedName || "Гость";
+        } else {
+          localStorage.setItem('sapa_tgId', state.tgId);
+          localStorage.setItem('sapa_name', state.userName);
+        }
+      }
+      document.getElementById('order-name').value = state.userName;
+    }
+
+    // Загрузка первичных данных из Google Apps Script API
+    async function loadData() {
+      try {
+        const response = await fetch(`${CONFIG.API_URL}?action=getInitialData&tgId=${state.tgId}&name=${encodeURIComponent(state.userName)}`);
+        const result = await response.json();
+        
+        if (result.success) {
+          state.menu = result.menu;
+          state.banners = result.banners;
+          state.userProfile = result.user;
+          
+          document.getElementById('user-bonuses').innerText = state.userProfile.bonuses;
+          if(state.userProfile.phone) {
+            document.getElementById('order-phone').value = state.userProfile.phone;
+          }
+          
+          renderBanners();
+          renderTags();
+          renderProducts();
+        }
+      } catch (error) {
+        console.error("Критическая ошибка связи с сервером API:", error);
+      }
+    }
+
+    // Отрендерить баннеры акций
+    function renderBanners() {
+      const container = document.getElementById('banners-container');
+      container.innerHTML = state.banners.map(b => `
+        <div class="w-full shrink-0 h-36 rounded-2xl relative overflow-hidden snap-center border border-zinc-800/80">
+          <img src="${b.img}" class="w-full h-full object-cover brightness-50" alt="" />
+          <div class="absolute inset-0 p-4 flex flex-col justify-end bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent">
+            <h4 class="text-sm font-black text-amber-400 tracking-wide">${b.title}</h4>
+            <p class="text-[11px] text-zinc-300 mt-0.5 line-clamp-2 leading-tight">${b.desc}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Собрать и отрендерить уникальные теги
+    function renderTags() {
+      const container = document.getElementById('tags-container');
+      const allTags = new Set(["Все"]);
+      state.menu.forEach(item => { if(item.tags) item.tags.split(',').forEach(t => allTags.add(t.trim())); });
+      
+      container.innerHTML = Array.from(allTags).map(tag => {
+        const isActive = tag === state.currentTag;
+        return `
+          <button onclick="filterByTag('${tag}')" class="shrink-0 text-xs font-extrabold px-4 py-2.5 rounded-full transition-all tracking-wide ${isActive ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-zinc-950 shadow-lg scale-105' : 'bg-zinc-900 text-zinc-400 border border-zinc-800'}">
+            ${tag === 'Все' ? 'Все меню' : tag}
+          </button>
+        `;
+      }).join('');
+    }
+
+    function filterByTag(tag) {
+      state.currentTag = tag;
+      renderTags();
+      renderProducts();
+    }
+
+    // Отрендерить витрину товаров
+    function renderProducts() {
+      const grid = document.getElementById('products-grid');
+      const filtered = state.menu.filter(item => state.currentTag === "Все" || (item.tags && item.tags.includes(state.currentTag)));
+      
+      grid.innerHTML = filtered.map(item => {
+        const count = state.cart[item.id] || 0;
+        return `
+          <div class="bg-zinc-900 border border-zinc-800/60 rounded-2xl overflow-hidden flex flex-col justify-between shadow-lg">
+            <div class="relative h-28 bg-zinc-950">
+              <img src="${item.img}" class="w-full h-full object-cover" alt="" />
+            </div>
+            <div class="p-3 flex-1 flex flex-col justify-between space-y-2">
+              <div>
+                <h5 class="text-xs font-black tracking-wide text-white line-clamp-1">${item.name}</h5>
+                <p class="text-[10px] text-zinc-400 line-clamp-2 leading-tight mt-0.5">${item.desc}</p>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-xs font-black text-amber-400">${item.price} ₸</span>
+                ${count > 0 ? `
+                  <div class="flex items-center bg-zinc-800 border border-zinc-700 rounded-lg p-0.5">
+                    <button onclick="changeCartCount('${item.id}', -1)" class="w-6 h-6 flex items-center justify-center font-black text-white text-xs select-none">-</button>
+                    <span class="text-xs font-bold px-2 text-white">${count}</span>
+                    <button onclick="changeCartCount('${item.id}', 1)" class="w-6 h-6 flex items-center justify-center font-black text-white text-xs select-none">+</button>
+                  </div>
+                ` : `
+                  <button onclick="changeCartCount('${item.id}', 1)" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-extrabold text-[10px] px-3 py-1.5 rounded-lg uppercase tracking-wider">Хочу</button>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Логика изменения количества в корзине
+    function changeCartCount(id, delta) {
+      const current = state.cart[id] || 0;
+      const next = current + delta;
+      if (next <= 0) delete state.cart[id];
+      else state.cart[id] = next;
+      
+      renderProducts();
+      updateStickyCartBar();
+      if(document.getElementById('cart-sheet').classList.contains('translate-y-0')) {
+        renderCartItemsList();
+      }
+    }
+
+    // Обновление липкой плашки снизу
+    function updateStickyCartBar() {
+      const trigger = document.getElementById('sticky-cart-trigger');
+      let totalCount = 0;
+      let subtotal = 0;
+      
+      for(let id in state.cart) {
+        let item = state.menu.find(m => m.id === id);
+        if(item) {
+          totalCount += state.cart[id];
+          subtotal += item.price * state.cart[id];
+        }
+      }
+      
+      if(totalCount > 0) {
+        document.getElementById('sticky-cart-count').innerText = totalCount;
+        document.getElementById('sticky-cart-total').innerText = subtotal + " ₸";
+        trigger.classList.remove('translate-y-24', 'opacity-0', 'pointer-events-none');
+      } else {
+        trigger.classList.add('translate-y-24', 'opacity-0', 'pointer-events-none');
+        toggleCart(false);
+      }
+    }
+
+    // Показ/скрытие шторки корзины
+    function toggleCart(show) {
+      const sheet = document.getElementById('cart-sheet');
+      if(show) {
+        sheet.classList.remove('translate-y-full');
+        renderCartItemsList();
+      } else {
+        sheet.classList.add('translate-y-full');
+      }
+    }
+
+    // Рендеринг элементов внутри корзины и просчет условий акций
+    function renderCartItemsList() {
+      const list = document.getElementById('cart-items-list');
+      let html = '';
+      let subtotal = 0;
+      let totalItemsCount = 0;
+      
+      for(let id in state.cart) {
+        let item = state.menu.find(m => m.id === id);
+        if(item) {
+          let count = state.cart[id];
+          subtotal += item.price * count;
+          totalItemsCount += count;
+          
+          html += `
+            <div class="flex items-center justify-between py-2.5">
+              <div class="max-w-[60%]">
+                <p class="text-xs font-black text-white">${item.name}</p>
+                <p class="text-[10px] text-amber-400 font-bold">${item.price} ₸</p>
+              </div>
+              <div class="flex items-center bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
+                <button onclick="changeCartCount('${item.id}', -1)" class="w-6 h-6 flex items-center justify-center font-black text-zinc-400 text-xs">-</button>
+                <span class="text-xs font-bold px-2 text-white">${count}</span>
+                <button onclick="changeCartCount('${item.id}', 1)" class="w-6 h-6 flex items-center justify-center font-black text-zinc-400 text-xs">+</button>
+              </div>
+            </div>
+          `;
+        }
+      }
+      
+      list.innerHTML = html;
+      document.getElementById('price-subtotal').innerText = subtotal + " ₸";
+      
+      // Авто-Комбо правило (Маркетинг)
+      const comboAlert = document.getElementById('combo-alert');
+      const rowDiscount = document.getElementById('row-discount');
+      let discount = 0;
+      if (totalItemsCount >= CONFIG.MIN_ITEMS_FOR_COMBO) {
+        discount = CONFIG.COMBO_DISCOUNT;
+        comboAlert.classList.remove('hidden');
+        rowDiscount.classList.remove('hidden');
+        document.getElementById('price-discount').innerText = `-${discount} ₸`;
+      } else {
+        comboAlert.classList.add('hidden');
+        rowDiscount.classList.add('hidden');
+      }
+      
+      // Вычисление доступных лимитов по бонусам (не более 30% от чека с учетом комбо)
+      let baseForBonus = subtotal - discount;
+      let maxBonusSpendable = Math.floor(baseForBonus * 0.3);
+      let dynamicAllowedBonuses = Math.min(state.userProfile.bonuses, maxBonusSpendable);
+      document.getElementById('cart-available-bonuses').innerText = dynamicAllowedBonuses + " ₸";
+      
+      setPaymentMethod(state.selectedPaymentMethod);
+      recalculateTotalPrice();
+    }
+
+    function applyMaxBonuses() {
+      const subtotal = parsePrice(document.getElementById('price-subtotal').innerText);
+      const discount = !document.getElementById('row-discount').classList.contains('hidden') ? CONFIG.COMBO_DISCOUNT : 0;
+      let baseForBonus = subtotal - discount;
+      let maxBonusSpendable = Math.floor(baseForBonus * 0.3);
+      document.getElementById('bonus-input').value = Math.min(state.userProfile.bonuses, maxBonusSpendable);
+      recalculateTotalPrice();
+    }
+
+    function parsePrice(str) { return Number(str.replace(/[^0-9]/g, '')); }
+
+    // Математический перерасчет финальной цены на фронтенде перед отправкой
+    function recalculateTotalPrice() {
+      const subtotal = parsePrice(document.getElementById('price-subtotal').innerText);
+      const discount = !document.getElementById('row-discount').classList.contains('hidden') ? CONFIG.COMBO_DISCOUNT : 0;
+      
+      let bonusInput = Number(document.getElementById('bonus-input').value) || 0;
+      let baseForBonus = subtotal - discount;
+      let maxBonusSpendable = Math.floor(baseForBonus * 0.3);
+      let allowedBonuses = Math.min(state.userProfile.bonuses, maxBonusSpendable, bonusInput);
+      
+      if(bonusInput > allowedBonuses) {
+        document.getElementById('bonus-input').value = allowedBonuses;
+      }
+      
+      const rowBonuses = document.getElementById('row-bonuses');
+      if (allowedBonuses > 0) {
+        rowBonuses.classList.remove('hidden');
+        document.getElementById('price-bonuses').innerText = `-${allowedBonuses} ₸`;
+      } else {
+        rowBonuses.classList.add('hidden');
+      }
+      
+      let finalPrice = baseForBonus - allowedBonuses;
+      document.getElementById('price-final').innerText = (finalPrice < 0 ? 0 : finalPrice) + " ₸";
+    }
+
+    // Переключение тумблеров методов оплаты
+    function setPaymentMethod(method) {
+      state.selectedPaymentMethod = method;
+      const kaspiBtn = document.getElementById('pay-kaspi');
+      const cashBtn = document.getElementById('pay-cash');
+      const kaspiBlock = document.getElementById('kaspi-details-block');
+      
+      document.getElementById('kaspi-phone-text').innerText = CONFIG.KASPI_PHONE;
+      document.getElementById('kaspi-name-text').innerText = CONFIG.KASPI_RECEIVER;
+      
+      if(method === "Kaspi Перевод") {
+        kaspiBtn.className = "border border-amber-500 bg-amber-500/10 text-amber-400 rounded-xl py-3 text-xs font-bold transition-all";
+        cashBtn.className = "border border-zinc-800 bg-zinc-950 text-zinc-400 rounded-xl py-3 text-xs font-semibold transition-all";
+        kaspiBlock.classList.remove('hidden');
+      } else {
+        cashBtn.className = "border border-amber-500 bg-amber-500/10 text-amber-400 rounded-xl py-3 text-xs font-bold transition-all";
+        kaspiBtn.className = "border border-zinc-800 bg-zinc-950 text-zinc-400 rounded-xl py-3 text-xs font-semibold transition-all";
+        kaspiBlock.classList.add('hidden');
+      }
+    }
+
+    // Копирование телефона в буфер обмена с поддержкой Haptic Feedback в ТГ
+    function copyKaspiPhone() {
+      navigator.clipboard.writeText(CONFIG.KASPI_PHONE.replace(/\s+/g, ''));
+      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred("success");
+      }
+      alert("Номер телефона скопирован для Kaspi!");
+    }
+
+    // Валидация анкеты и безопасный деплой заказа в БД через POST
+    async function submitOrder() {
+      const name = document.getElementById('order-name').value.trim();
+      const phone = document.getElementById('order-phone').value.trim();
+      const address = document.getElementById('order-address').value.trim();
+      
+      if(!name || !phone || !address) { alert("Пожалуйста, заполните все поля анкеты!"); return; }
+      
+      // Жесткая валидация казахстанских номеров (11 цифр, старт с 7 или 8)
+      const kzPhoneRegex = /^(7|8)\d{10}$/;
+      if(!kzPhoneRegex.test(phone.replace(/\D/g, ''))) {
+        alert("Пожалуйста, укажите корректный казахстанский мобильный номер телефона (11 цифр)!");
+        return;
+      }
+      
+      // БЛОКИРОВКА КНОПКИ ДЛЯ ИСКЛЮЧЕНИЯ ДУБЛИРОВАНИЯ СТРОК
+      const submitBtn = document.getElementById('btn-submit-order');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span>Оформляем... ⏳</span>`;
+      
+      let itemsSummary = [];
+      let subtotal = 0;
+      for(let id in state.cart) {
+        let item = state.menu.find(m => m.id === id);
+        if(item) {
+          itemsSummary.push(`• ${item.name} x${state.cart[id]} (${item.price * state.cart[id]} ₸)`);
+          subtotal += item.price * state.cart[id];
+        }
+      }
+      
+      const discount = !document.getElementById('row-discount').classList.contains('hidden') ? CONFIG.COMBO_DISCOUNT : 0;
+      const bonusesSpent = Number(document.getElementById('bonus-input').value) || 0;
+      const finalPrice = parsePrice(document.getElementById('price-final').innerText);
+      
+      const payload = {
+        action: "placeOrder",
+        tgId: state.tgId,
+        clientName: name,
+        phone: phone,
+        address: address,
+        itemsSummary: itemsSummary.join('\n'),
+        totalPrice: subtotal,
+        finalPrice: finalPrice,
+        bonusesSpent: bonusesSpent,
+        paymentMethod: state.selectedPaymentMethod
+      };
+      
+      try {
+        const response = await fetch(CONFIG.API_URL, {
+          method: "POST",
+          mode: "no-cors", // Предотвращает ошибки preflight-запросов к макросам Google
+          body: JSON.stringify(payload)
+        });
+        
+        // Так как при 'no-cors' ответ от GAS приходит непрозрачный, мы очищаем корзину и перенаправляем на трекер программно
+        alert("Заказ успешно отправлен на кухню! Переходим в историю заказов.");
+        state.cart = {};
+        updateStickyCartBar();
+        renderProducts();
+        toggleCart(false);
+        switchTab('orders');
+      } catch (error) {
+        alert("Произошла ошибка при отправке. Пожалуйста, попробуйте снова.");
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span>Подтвердить заказ</span>`;
+      }
+    }
+
+    // Переключение Табов интерфейса и запуск фонового таймера-трекера
+    let trackingInterval = null;
+    function switchTab(tab) {
+      const menuTab = document.getElementById('tab-menu');
+      const ordersTab = document.getElementById('tab-orders');
+      const navMenu = document.getElementById('nav-menu');
+      const navOrders = document.getElementById('nav-orders');
+      
+      if(tab === 'menu') {
+        menuTab.classList.remove('hidden');
+        ordersTab.classList.add('hidden');
+        navMenu.className = "flex-1 flex flex-col justify-center items-center text-amber-500 font-bold text-xs gap-0.5";
+        navOrders.className = "flex-1 flex flex-col justify-center items-center text-zinc-500 font-semibold text-xs gap-0.5";
+        clearInterval(trackingInterval);
+      } else {
+        ordersTab.classList.remove('hidden');
+        menuTab.classList.add('hidden');
+        navOrders.className = "flex-1 flex flex-col justify-center items-center text-amber-500 font-bold text-xs gap-0.5";
+        navMenu.className = "flex-1 flex flex-col justify-center items-center text-zinc-500 font-semibold text-xs gap-0.5";
+        
+        fetchOrdersHistory();
+        // АВТОМАТИЧЕСКИЙ ТРЕКЕР: Опрашиваем бэкенд каждые 10 секунд
+        trackingInterval = setInterval(fetchOrdersHistory, 10000);
+      }
+    }
+
+    // Запрос статуса активного заказа из Google Sheets
+    async function fetchOrdersHistory() {
+      try {
+        const response = await fetch(`${CONFIG.API_URL}?action=getActiveStatus&tgId=${state.tgId}`);
+        const result = await response.json();
+        
+        if (result.success && result.history) {
+          renderHistoryList(result.history);
+          checkForActiveTracking(result.history);
+        }
+      } catch (e) {
+        console.error("Ошибка обновления истории заказов", e);
+      }
+    }
+
+    function renderHistoryList(history) {
+      const container = document.getElementById('orders-history-list');
+      if (history.length === 0) {
+        container.innerHTML = `<p class="text-xs text-zinc-500 text-center py-8">Вы еще ничего не заказывали у нас.</p>`;
+        return;
+      }
+      
+      container.innerHTML = history.map(o => `
+        <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-bold text-white">${o.id}</span>
+            <span class="text-[10px] bg-zinc-800 text-amber-400 px-2 py-0.5 rounded-md font-bold">${o.status}</span>
+          </div>
+          <p class="text-[11px] text-zinc-400 whitespace-pre-line leading-relaxed">${o.items}</p>
+          <div class="border-t border-zinc-800/60 pt-2 flex justify-between items-center text-[11px]">
+            <span class="text-zinc-500">${new Date(o.date).toLocaleDateString('ru-RU')}</span>
+            <span class="font-extrabold text-white">Итого: ${o.total} ₸</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Анализ наличия активных заказов для рендеринга Виджета Прогресса
+    function checkForActiveTracking(history) {
+      const widget = document.getElementById('tracking-widget');
+      const activeOrder = history.find(o => o.status !== "Доставлен" && o.status !== "Отменен");
+      
+      if (!activeOrder) {
+        widget.classList.add('hidden');
+        return;
+      }
+      
+      widget.classList.remove('hidden');
+      document.getElementById('track-order-id').innerText = activeOrder.id;
+      document.getElementById('track-status-text').innerText = `Текущий статус: ${activeOrder.status}`;
+      
+      const bar = document.getElementById('track-progress');
+      const sNew = document.getElementById('step-new');
+      const sCook = document.getElementById('step-cooking');
+      const sDel = document.getElementById('step-delivery');
+      
+      // Сброс стилей шагов
+      sNew.className = sCook.className = sDel.className = "text-zinc-500";
+      
+      if(activeOrder.status === "Новый") {
+        bar.style.width = "15%";
+        sNew.className = "text-amber-400 font-bold";
+      } else if (activeOrder.status.indexOf("Готовится") !== -1) {
+        bar.style.width = "50%";
+        sCook.className = "text-amber-400 font-bold";
+      } else {
+        bar.style.width = "85%";
+        sDel.className = "text-amber-400 font-bold";
+      }
+    }
+
+    // Запуск конвейера при загрузке страницы фронтенда
+    window.addEventListener('DOMContentLoaded', () => {
+      initAuthentication();
+      loadData();
+    });
+  </script>
+</body>
+</html>
