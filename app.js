@@ -268,10 +268,20 @@ async function sendOrder() {
   const { sum, count } = cartTotals();
   if (count === 0) return alert('Корзина пуста');
 
+  // Блокируем кнопку, чтобы двойной тап не создал второй заказ
+  const btn = document.getElementById('sendOrderBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const btnHtml = btn.innerHTML;
+  btn.innerHTML = 'Отправляем...';
+
   const orderType = document.getElementById('orderType').value;
   const payment = document.getElementById('paymentMethod').value;
   const bonusesUsed = Number(document.getElementById('bonusInput').value) || 0;
   const preorder = document.getElementById('preorderTime').value;
+
+  // Уникальный ключ запроса — бэкенд по нему отсекает повторы
+  const requestId = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
   const items = Object.values(state.cart).map(c => ({
     name: c.item.name, qty: c.qty, price: c.item.price
@@ -281,7 +291,7 @@ async function sendOrder() {
     // 1) Сохраняем заказ на бэке (бонусы спишутся/начислятся там же)
     const res = await apiPost('createOrder', {
       phone: state.user.phone, items, totalSum: sum,
-      bonusesUsed, paymentMethod: payment, orderType
+      bonusesUsed, paymentMethod: payment, orderType, requestId
     });
 
     // 2) Формируем красивый текст для администратора
@@ -306,33 +316,74 @@ async function sendOrder() {
     updateCartUI(); updateProfileUI();
     bootstrap.Modal.getInstance(document.getElementById('cartModal')).hide();
     alert(`Заказ оформлен! Начислено бонусов: ${res.accrued}₸`);
-  } catch (e) { alert('Ошибка: ' + e.message); }
+  } catch (e) {
+    alert('Ошибка: ' + e.message);
+  } finally {
+    // Разблокируем кнопку в любом случае
+    btn.disabled = false;
+    btn.innerHTML = btnHtml;
+  }
 }
 
 // === ВКЛАДКА "МОИ ЗАКАЗЫ" ===============================================
 async function loadOrders() {
   const box = document.getElementById('ordersList');
   if (!state.user) { box.innerHTML = '<p class="text-muted">Войдите, чтобы видеть заказы</p>'; return; }
-  box.innerHTML = '<p class="text-muted">Загрузка...</p>';
+
+  // Блок реферальной программы — всегда наверху вкладки
+  const refBlock = `
+    <div class="card mb-3 border-warning shadow-sm">
+      <div class="card-body p-3">
+        <h6 class="mb-1"><i class="bi bi-gift"></i> Приглашайте друзей</h6>
+        <p class="small text-muted mb-2">Друг вводит ваш промокод при регистрации — вы получаете 10% бонусами с каждого его заказа.</p>
+        <div class="d-flex gap-2">
+          <input class="form-control text-center fw-bold" value="${state.user.referralCode}" readonly>
+          <button class="btn btn-outline-secondary" id="copyRefBtn" title="Скопировать"><i class="bi bi-clipboard"></i></button>
+          <button class="btn btn-success" id="shareRefBtn" title="Поделиться"><i class="bi bi-whatsapp"></i></button>
+        </div>
+      </div>
+    </div>`;
+
+  box.innerHTML = refBlock + '<p class="text-muted">Загрузка заказов...</p>';
+  bindReferralButtons();
+
   try {
     const orders = await apiGet('getOrders', { phone: state.user.phone });
-    if (!orders.length) { box.innerHTML = '<p class="text-muted">Заказов пока нет</p>'; return; }
-    box.innerHTML = orders.map(o => `
-      <div class="card mb-2 shadow-sm"><div class="card-body p-3">
-        <div class="d-flex justify-content-between">
-          <strong>${o.orderId}</strong>
-          <span class="badge text-bg-secondary">${o.orderType}</span>
-        </div>
-        <small class="text-muted">${new Date(o.dateTime).toLocaleString('ru-RU')}</small>
-        <ul class="small mt-2 mb-1 ps-3">
-          ${o.items.map(i => `<li>${i.name} ×${i.qty}</li>`).join('')}
-        </ul>
-        <div class="d-flex justify-content-between small">
-          <span>Оплата: ${o.paymentMethod}</span>
-          <strong>${o.totalSum - o.bonusesUsed} ₸</strong>
-        </div>
-      </div></div>`).join('');
-  } catch (e) { box.innerHTML = '<p class="text-danger">Ошибка: ' + e.message + '</p>'; }
+    const ordersHtml = !orders.length
+      ? '<p class="text-muted">Заказов пока нет</p>'
+      : orders.map(o => `
+        <div class="card mb-2 shadow-sm"><div class="card-body p-3">
+          <div class="d-flex justify-content-between">
+            <strong>${o.orderId}</strong>
+            <span class="badge text-bg-secondary">${o.orderType}</span>
+          </div>
+          <small class="text-muted">${new Date(o.dateTime).toLocaleString('ru-RU')}</small>
+          <div class="small mt-2 mb-1" style="white-space:pre-line">${o.items}</div>
+          <div class="d-flex justify-content-between small">
+            <span>Оплата: ${o.paymentMethod}</span>
+            <strong>${o.totalSum - o.bonusesUsed} ₸</strong>
+          </div>
+        </div></div>`).join('');
+    box.innerHTML = refBlock + ordersHtml;
+    bindReferralButtons();
+  } catch (e) {
+    box.innerHTML = refBlock + '<p class="text-danger">Ошибка: ' + e.message + '</p>';
+    bindReferralButtons();
+  }
+}
+
+// Кнопки "копировать" и "поделиться" для реферального кода
+function bindReferralButtons() {
+  const code = state.user.referralCode;
+  const copyBtn = document.getElementById('copyRefBtn');
+  const shareBtn = document.getElementById('shareRefBtn');
+  if (copyBtn) copyBtn.onclick = () => {
+    navigator.clipboard.writeText(code).then(() => alert('Промокод скопирован: ' + code));
+  };
+  if (shareBtn) shareBtn.onclick = () => {
+    const text = `Заказывай вкусно! Введи мой промокод ${code} при регистрации 🎁`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
 }
 
 // === ПЕРЕКЛЮЧЕНИЕ СТРАНИЦ ================================================
