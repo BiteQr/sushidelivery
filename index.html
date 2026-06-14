@@ -68,7 +68,7 @@
             opacity: 0.3;
         }
 
-        /* Баннеры-Истории */
+        /* Динамические Баннеры (Hero section) */
         .stories-container {
             display: flex;
             gap: 14px;
@@ -79,10 +79,12 @@
         .stories-container::-webkit-scrollbar { display: none; }
 
         .story-card {
-            flex: 0 0 150px;
-            height: 105px;
+            flex: 0 0 170px;
+            height: 115px;
             border-radius: 20px;
             background: linear-gradient(145deg, #ff9e42, var(--dodo-orange));
+            background-size: cover;
+            background-position: center;
             color: white;
             padding: 14px;
             display: flex;
@@ -93,22 +95,27 @@
             letter-spacing: -0.2px;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 10px 20px rgba(255, 102, 0, 0.15), 0 4px 6px rgba(0, 0, 0, 0.05);
-            transition: transform 0.3s var(--apple-ease);
+            box-shadow: 0 8px 20px rgba(255, 102, 0, 0.12), 0 4px 6px rgba(0, 0, 0, 0.04);
+            transition: transform 0.3s var(--apple-ease), box-shadow 0.3s ease;
+            cursor: pointer;
         }
         
+        /* Затемнение картинки баннера для читаемости текста */
         .story-card::before {
             content: '';
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(to bottom, rgba(255,255,255,0.15), transparent);
+            background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.55));
+            z-index: 1;
+        }
+
+        .story-card * {
+            position: relative;
+            z-index: 2;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.4);
         }
         
         .story-card:active { transform: scale(0.95); }
-        .story-card.promo-2 { 
-            background: linear-gradient(145deg, #66bb6a, #2e7d32); 
-            box-shadow: 0 10px 20px rgba(46, 125, 50, 0.15), 0 4px 6px rgba(0, 0, 0, 0.05);
-        }
 
         /* Навигация */
         .categories-nav {
@@ -158,7 +165,14 @@
             border-radius: 24px;
             align-items: center;
             box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
-            transition: transform 0.25s var(--apple-ease);
+            transition: transform 0.25s var(--apple-ease), background-color 0.4s ease;
+        }
+
+        /* Эффект подсветки при клике на баннер */
+        .product-card.highlight-flash {
+            background-color: #fff4eb;
+            transform: scale(1.02);
+            border: 1px solid rgba(255,102,0,0.2);
         }
 
         .product-image {
@@ -234,23 +248,14 @@
         <div class="city-selector">Доставка: <span>Уральск</span></div>
     </header>
 
-    <div class="stories-container">
-        <div class="story-card promo-1">
-            <span>🎁 Морс в подарок</span>
-            <span style="font-size: 11px; font-weight: 500; opacity: 0.9;">При первом заказе</span>
-        </div>
-        <div class="story-card promo-2">
-            <span>🔥 Сет Недели</span>
-            <span style="font-size: 11px; font-weight: 500; opacity: 0.9;">Скидка -15%</span>
-        </div>
-        <div class="story-card promo-1">
-            <span>🚲 Быстрая доставка</span>
-            <span style="font-size: 11px; font-weight: 500; opacity: 0.9;">До 45 минут</span>
-        </div>
+    <div class="stories-container" id="bannersContainer">
+        <div style="color: var(--dodo-text-muted); font-size: 13px; padding: 10px;">Загрузка акций...</div>
     </div>
 
     <div class="categories-nav" id="categoriesNav"></div>
-    <div id="menuContainer"></div>
+    <div id="menuContainer">
+        <div style="text-align: center; padding: 40px; color: var(--dodo-text-muted);">Синхронизация меню с таблицей...</div>
+    </div>
 
     <div class="bottom-cart-bar" id="bottomCartBar">
         <button class="dodo-cart-btn" onclick="openCartCheckout()">
@@ -267,12 +272,13 @@
         tg.setHeaderColor('#ffffff');
         tg.setBackgroundColor('#f8f9fa');
 
-        // --- ИСПРАВЛЕНИЕ БАГА С АНОНИМОМ / ХАРДКОДНЫМ ID ---
-        let userId = "999999";
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+        // Получение или генерация ID пользователя
+        let userId = "anon";
+        let userName = "Гость";
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
             userId = tg.initDataUnsafe.user.id.toString();
+            userName = tg.initDataUnsafe.user.first_name || "Пользователь";
         } else {
-            // Если открыто вне ТГ, генерируем сессионный уникальный токен устройства
             let localId = localStorage.getItem('sapa_delivery_uid');
             if (!localId) {
                 localId = 'anon_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
@@ -280,7 +286,6 @@
             }
             userId = localId;
         }
-        // --------------------------------------------------
 
         const CONFIG = {
             API_URL: "https://script.google.com/macros/s/AKfycbztlLi7MWstDiWX4l8zwf3qzcpW0ceBbwpeSBySqbSOqDFz_Bfj4AN_iF99HH-jv1q3/exec"
@@ -288,31 +293,123 @@
 
         let cart = {};
         let menuData = [];
+        let bannersData = [];
+        let userProfile = {};
 
+        // Фолбэк-данные на случай сбоя сети
         const mockMenu = [
-            { id: "1", name: "Филадельфия Лайт", category: "Роллы", price: 2100, description: "Нежный лосось, сливочный сыр крем-чиз, свежий огурец и рис.", img: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400" },
-            { id: "2", name: "Калифорния", category: "Роллы", price: 1800, description: "Снежный краб, майонез, огурец, авокадо, икра тобико.", img: "https://images.unsplash.com/photo-1611143669185-af224c5e3252?w=400" },
-            { id: "3", name: "Запеченный Сет", category: "Сеты", price: 5500, description: "Три вида горячих запеченных роллов под фирменным соусом.", img: "https://images.unsplash.com/photo-1553621042-f6e147245754?w=400" },
-            { id: "4", name: "Coca-Cola 0.5", category: "Напитки", price: 450, description: "Классический освежающий напиток.", img: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400" }
+            { id: "S1", name: "Филадельфия Лайт", category: "Роллы", price: 2100, description: "Лосось, сливочный сыр крем-чиз, свежий огурец и рис.", imageUrl: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400" },
+            { id: "S2", name: "Калифорния", category: "Роллы", price: 1800, description: "Снежный краб, майонез, огурец, авокадо, икра тобико.", imageUrl: "https://images.unsplash.com/photo-1611143669185-af224c5e3252?w=400" }
+        ];
+        const mockBanners = [
+            { id: "B1", type: "product", title: "Филадельфия", description: "Хит недели со скидкой", imageUrl: "", targetId: "S1" }
         ];
 
-        async function loadMenu() {
+        // Основная функция загрузки всех данных через новый универсальный эндпоинт
+        async function loadInitialData() {
             try {
-                // Передаем userId в таблицу, если бэкенд собирает аналитику просмотров
-                const response = await fetch(`${CONFIG.API_URL}?action=getMenu&userId=${userId}`);
+                const url = `${CONFIG.API_URL}?action=getInitialData&tgId=${userId}&name=${encodeURIComponent(userName)}`;
+                const response = await fetch(url);
+                
                 if (response.ok) {
-                    menuData = await response.json();
+                    const result = await response.json();
+                    if (result.success) {
+                        menuData = result.menu || [];
+                        bannersData = result.banners || [];
+                        userProfile = result.user || {};
+                    } else {
+                        throw new Error(result.error || "Ошибка структуры");
+                    }
                 } else {
-                    menuData = mockMenu;
+                    throw new Error("Ошибка ответа сервера");
                 }
             } catch (e) {
-                console.log("Используем демо-меню:", e);
+                console.error("Используем демо-данные из-за ошибки:", e);
                 menuData = mockMenu;
+                bannersData = mockBanners;
             }
+            
+            renderBanners();
             renderUI();
         }
 
+        // Рендеринг динамических баннеров Hero-section из таблицы
+        function renderBanners() {
+            const container = document.getElementById('bannersContainer');
+            if (!bannersData || bannersData.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = bannersData.map(banner => {
+                // Если указана картинка, ставим её на фон
+                const bgStyle = banner.imageUrl 
+                    ? `style="background-image: url('${banner.imageUrl}');"` 
+                    : `style="background: linear-gradient(145deg, #ff9e42, var(--dodo-orange));"`;
+
+                return `
+                    <div class="story-card" ${bgStyle} onclick="handleBannerClick('${banner.targetId}')">
+                        <div>
+                            <div class="banner-title">${banner.title}</div>
+                            <div style="font-size: 11px; font-weight: 500; opacity: 0.9; margin-top: 4px;">${banner.description}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Обработчик умного клика на баннер (скролл к товару или категории)
+        function handleBannerClick(target) {
+            if (!target) return;
+            const cleanedTarget = target.trim().toUpperCase();
+
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+
+            // 1. Проверяем, является ли таргет ID конкретного товара (например, S1, S2)
+            const productElement = document.getElementById(`product-card-${cleanedTarget}`);
+            if (productElement) {
+                const offset = 120;
+                const bodyRect = document.body.getBoundingClientRect().top;
+                const elementRect = productElement.getBoundingClientRect().top;
+                const offsetPosition = (elementRect - bodyRect) - offset;
+
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+
+                // Добавляем красивый визуальный фокус-эффект на карточку
+                productElement.classList.add('highlight-flash');
+                setTimeout(() => productElement.classList.remove('highlight-flash'), 1500);
+                return;
+            }
+
+            // 2. Если товар не найден, проверяем, вдруг это имя категории (например, Роллы, Напитки)
+            const categoryElement = document.getElementById(`cat-${target.trim()}`);
+            if (categoryElement) {
+                const offset = 75;
+                const bodyRect = document.body.getBoundingClientRect().top;
+                const elementRect = categoryElement.getBoundingClientRect().top;
+                const offsetPosition = (elementRect - bodyRect) - offset;
+
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                
+                // Переключаем активный таб в навигации
+                document.querySelectorAll('.category-tab').forEach(tab => {
+                    if (tab.innerText.trim() === target.trim()) {
+                        document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                    }
+                });
+            }
+        }
+
+        // Рендеринг меню и категорий
         function renderUI() {
+            if (!menuData || menuData.length === 0) {
+                document.getElementById('menuContainer').innerHTML = `<div style="text-align: center; padding: 40px; color: var(--dodo-text-muted);">В данный момент меню пусто.</div>`;
+                return;
+            }
+
             const categories = [...new Set(menuData.map(item => item.category))];
             
             const nav = document.getElementById('categoriesNav');
@@ -336,8 +433,8 @@
         function renderProductCard(p) {
             const count = cart[p.id] ? cart[p.id].count : 0;
             return `
-                <div class="product-card">
-                    <img src="${p.img || 'https://via.placeholder.com/120'}" class="product-image" alt="${p.name}">
+                <div class="product-card" id="product-card-${p.id}">
+                    <img src="${p.imageUrl || 'https://via.placeholder.com/120'}" class="product-image" alt="${p.name}">
                     <div class="product-info">
                         <div>
                             <div class="product-name">${p.name}</div>
@@ -427,8 +524,7 @@
                 const offset = 75; 
                 const bodyRect = document.body.getBoundingClientRect().top;
                 const elementRect = element.getBoundingClientRect().top;
-                const elementPosition = elementRect - bodyRect;
-                const offsetPosition = elementPosition - offset;
+                const offsetPosition = (elementRect - bodyRect) - offset;
 
                 window.scrollTo({
                     top: offsetPosition,
@@ -447,7 +543,6 @@
                 total += item.count * item.product.price;
             }
 
-            // Передаем сформированный userId обратно боту вместе с заказом
             const orderData = {
                 userId: userId, 
                 items: orderList,
@@ -458,7 +553,8 @@
             tg.close();
         }
 
-        window.onload = loadMenu;
+        // Запуск инициализации при полной загрузке страницы
+        window.onload = loadInitialData;
     </script>
 </body>
 </html>
