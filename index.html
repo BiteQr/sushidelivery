@@ -156,6 +156,14 @@
             <option value="Наличные">Наличные</option>
           </select>
 
+          <!-- Промокод -->
+          <label class="form-label small fw-bold">Промокод</label>
+          <div class="input-group mb-2">
+            <input type="text" id="promoInput" class="form-control" placeholder="Введите промокод">
+            <button class="btn btn-outline-secondary" id="promoApplyBtn">Применить</button>
+          </div>
+          <div id="promoMsg" class="small mb-2"></div>
+
           <!-- Списание бонусов -->
           <div id="bonusBox" class="mb-2 hidden">
             <label class="form-label small fw-bold">
@@ -164,6 +172,10 @@
             <input type="number" id="bonusInput" class="form-control" value="0" min="0">
           </div>
 
+          <div id="discountRow" class="d-flex justify-content-between mt-2 text-success hidden">
+            <span>Скидка по промокоду:</span>
+            <strong id="discountSum">0 ₸</strong>
+          </div>
           <div class="d-flex justify-content-between mt-2">
             <span class="text-muted">Итого к оплате:</span>
             <strong id="finalSum">0 ₸</strong>
