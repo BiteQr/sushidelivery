@@ -14,7 +14,8 @@ const state = {
   banners: [],           // акции
   cart: {},              // корзина: { productId: { item, qty } }
   activeCategory: 'Все', // выбранная категория
-  pendingAuth: null      // временные данные авторизации (телефон/токен)
+  pendingAuth: null,     // временные данные авторизации (телефон/токен)
+  promo: null            // применённый промокод { code, type, value }
 };
 
 // === API: универсальные обёртки =========================================
@@ -205,17 +206,58 @@ function renderCartItems() {
   box.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => changeQty(b.dataset.dec, -1));
 }
 
-// Пересчёт итоговой суммы с учётом списания бонусов
+// Текущая скидка по применённому промокоду (пересчитывается от суммы корзины)
+function currentDiscount(sum) {
+  if (!state.promo) return 0;
+  let d = String(state.promo.type).toLowerCase() === 'percent'
+    ? Math.floor(sum * Number(state.promo.value) / 100)
+    : Number(state.promo.value) || 0;
+  return Math.min(d, sum); // не больше суммы заказа
+}
+
+// Пересчёт итоговой суммы с учётом промокода и списания бонусов
 function recalcFinal() {
   const { sum } = cartTotals();
+
+  // 1) Скидка по промокоду
+  const discount = currentDiscount(sum);
+  const afterPromo = Math.max(0, sum - discount);
+  const discountRow = document.getElementById('discountRow');
+  discountRow.classList.toggle('hidden', discount <= 0);
+  document.getElementById('discountSum').textContent = '−' + discount + ' ₸';
+
+  // 2) Бонусы: ограничение от суммы ПОСЛЕ скидки (бэк всё равно перепроверит)
   let bonus = Number(document.getElementById('bonusInput').value) || 0;
-  // ограничение списания на фронте (бэк всё равно перепроверит)
-  const maxByPercent = sum * (state.settings.MaxBonusSpendPercent || 0);
+  const maxByPercent = afterPromo * (state.settings.MaxBonusSpendPercent || 0);
   const maxByBalance = state.user ? state.user.bonusBalance : 0;
   const maxBonus = Math.floor(Math.min(maxByPercent, maxByBalance));
   if (bonus > maxBonus) { bonus = maxBonus; document.getElementById('bonusInput').value = bonus; }
   document.getElementById('bonusMax').textContent = maxBonus;
-  document.getElementById('finalSum').textContent = (sum - bonus) + ' ₸';
+
+  // 3) Итог
+  document.getElementById('finalSum').textContent = (afterPromo - bonus) + ' ₸';
+}
+
+// Применить промокод (проверка на бэке)
+async function applyPromo() {
+  const code = document.getElementById('promoInput').value.trim();
+  const msg = document.getElementById('promoMsg');
+  if (!code) { state.promo = null; msg.textContent = ''; recalcFinal(); return; }
+  const { sum } = cartTotals();
+  try {
+    const res = await apiGet('getPromo', { code, total: sum });
+    // Храним так, чтобы recalcFinal мог пересчитать скидку при изменении корзины
+    state.promo = res.type === 'percent'
+      ? { code: res.code, type: 'percent', value: res.discount / Math.max(sum, 1) * 100 }
+      : { code: res.code, type: 'fixed', value: res.discount };
+    msg.className = 'small mb-2 text-success';
+    msg.textContent = `Промокод применён: −${res.discount} ₸`;
+  } catch (e) {
+    state.promo = null;
+    msg.className = 'small mb-2 text-danger';
+    msg.textContent = e.message;
+  }
+  recalcFinal();
 }
 
 // === АВТОРИЗАЦИЯ ========================================================
@@ -245,12 +287,18 @@ async function confirmAuth() {
     const user = await apiPost('confirmAuth', state.pendingAuth);
     state.user = user;
     localStorage.setItem('user', JSON.stringify(user));
-    bootstrap.Modal.getInstance(document.getElementById('authModal')).hide();
     document.getElementById('newUserBanner').classList.add('hidden');
     updateProfileUI();
     // сброс формы
     document.getElementById('authStep1').classList.remove('hidden');
     document.getElementById('authStep2').classList.add('hidden');
+    // Если в корзине есть товары — после входа сразу вернём в корзину
+    const authEl = document.getElementById('authModal');
+    if (cartTotals().count > 0) {
+      authEl.addEventListener('hidden.bs.modal',
+        () => new bootstrap.Modal('#cartModal').show(), { once: true });
+    }
+    bootstrap.Modal.getInstance(authEl).hide();
   } catch (e) { alert('Ошибка: ' + e.message); }
 }
 
@@ -264,7 +312,20 @@ function updateProfileUI() {
 
 // === ОТПРАВКА ЗАКАЗА ====================================================
 async function sendOrder() {
-  if (!state.user) { new bootstrap.Modal('#authModal').show(); return; }
+  if (!state.user) {
+    // Не залогинен: сначала закрываем корзину, ПОТОМ открываем форму входа.
+    // Иначе модалка авторизации появляется ПОД слоем корзины.
+    const cartEl = document.getElementById('cartModal');
+    const cartInst = bootstrap.Modal.getInstance(cartEl);
+    if (cartInst) {
+      cartEl.addEventListener('hidden.bs.modal',
+        () => new bootstrap.Modal('#authModal').show(), { once: true });
+      cartInst.hide();
+    } else {
+      new bootstrap.Modal('#authModal').show();
+    }
+    return;
+  }
   const { sum, count } = cartTotals();
   if (count === 0) return alert('Корзина пуста');
 
@@ -286,12 +347,13 @@ async function sendOrder() {
   const items = Object.values(state.cart).map(c => ({
     name: c.item.name, qty: c.qty, price: c.item.price
   }));
+  const promoCode = state.promo ? state.promo.code : '';
 
   try {
-    // 1) Сохраняем заказ на бэке (бонусы спишутся/начислятся там же)
+    // 1) Сохраняем заказ на бэке (скидка, бонусы и кэшбэк считаются там же)
     const res = await apiPost('createOrder', {
       phone: state.user.phone, items, totalSum: sum,
-      bonusesUsed, paymentMethod: payment, orderType, requestId
+      bonusesUsed, paymentMethod: payment, orderType, requestId, promoCode
     });
 
     // 2) Формируем красивый текст для администратора
@@ -301,6 +363,7 @@ async function sendOrder() {
       `👤 ${state.user.name}\n📞 ${state.user.phone}\n🏠 ${state.user.address || '—'}\n\n` +
       `${lines}\n\n` +
       `Сумма: ${sum}₸\n` +
+      (res.discount ? `Скидка по промокоду ${res.promoCode}: −${res.discount}₸\n` : '') +
       (res.bonusesUsed ? `Списано бонусов: ${res.bonusesUsed}₸\n` : '') +
       `*К оплате: ${res.finalSum}₸*\n` +
       `Оплата: ${payment}\nТип: ${orderType}` +
@@ -309,8 +372,11 @@ async function sendOrder() {
     // 3) Открываем WhatsApp админа
     window.open(`https://wa.me/${state.settings.AdminWhatsApp}?text=${encodeURIComponent(msg)}`, '_blank');
 
-    // 4) Чистим корзину и обновляем баланс
+    // 4) Чистим корзину, промокод и обновляем баланс
     state.cart = {};
+    state.promo = null;
+    document.getElementById('promoInput').value = '';
+    document.getElementById('promoMsg').textContent = '';
     state.user.bonusBalance = res.newBalance;
     localStorage.setItem('user', JSON.stringify(state.user));
     updateCartUI(); updateProfileUI();
@@ -428,6 +494,9 @@ function bindEvents() {
 
   // ввод бонусов -> пересчёт
   document.getElementById('bonusInput').addEventListener('input', recalcFinal);
+
+  // промокод: применить
+  document.getElementById('promoApplyBtn').addEventListener('click', applyPromo);
 
   // отправка заказа
   document.getElementById('sendOrderBtn').addEventListener('click', sendOrder);
