@@ -88,10 +88,10 @@ async function refreshUser() {
 function renderBanners() {
   const box = document.getElementById('bannerScroll');
   box.innerHTML = state.banners.map(b => `
-    <div class="banner-card shadow-sm" data-banner="${b.id}">
-      <img src="${b.imageUrl}" alt="">
-      <div class="caption"><strong>${b.title}</strong></div>
-    </div>`).join('');
+    <button class="promo" data-banner="${b.id}">
+      <img src="${b.imageUrl}" loading="lazy" alt="">
+      <div class="promo__overlay"><span class="promo__title">${b.title}</span></div>
+    </button>`).join('');
 
   box.querySelectorAll('[data-banner]').forEach(el =>
     el.addEventListener('click', () => openBanner(el.dataset.banner)));
@@ -103,12 +103,12 @@ function openBanner(id) {
   const linked = state.menu.filter(m => b.productIds.includes(String(m.id)));
   document.getElementById('infoTitle').textContent = b.title;
   document.getElementById('infoBody').innerHTML = `
-    <img src="${b.imageUrl}" class="img-fluid rounded mb-3">
-    <p>${b.description || ''}</p>
+    <img src="${b.imageUrl}" class="img-fluid mb-3" style="border-radius:var(--radius)">
+    <p class="text-muted">${b.description || ''}</p>
     ${linked.map(m => `
-      <div class="d-flex justify-content-between align-items-center border-top py-2">
+      <div class="d-flex justify-content-between align-items-center py-2" style="border-top:1px solid var(--line)">
         <div><strong>${m.name}</strong><br><small class="text-muted">${m.price} ₸</small></div>
-        <button class="btn btn-sm btn-accent" data-add="${m.id}">В корзину</button>
+        <button class="btn btn-accent btn-sm" data-add="${m.id}">В корзину</button>
       </div>`).join('')}`;
   document.querySelectorAll('#infoBody [data-add]').forEach(btn =>
     btn.addEventListener('click', () => { addToCart(btn.dataset.add); }));
@@ -120,8 +120,7 @@ function renderCategories() {
   const cats = ['Все', ...new Set(state.menu.map(m => m.category).filter(Boolean))];
   const bar = document.getElementById('categoryBar');
   bar.innerHTML = cats.map(c => `
-    <button class="btn btn-sm cat-pill ${c === state.activeCategory ? 'btn-accent' : 'btn-outline-secondary'}"
-            data-cat="${c}">${c}</button>`).join('');
+    <button class="pill ${c === state.activeCategory ? 'is-active' : ''}" data-cat="${c}">${c}</button>`).join('');
   bar.querySelectorAll('[data-cat]').forEach(btn =>
     btn.addEventListener('click', () => { state.activeCategory = btn.dataset.cat; renderCategories(); renderMenu(); }));
 }
@@ -132,23 +131,18 @@ function renderMenu() {
     : state.menu.filter(m => m.category === state.activeCategory);
 
   document.getElementById('menuList').innerHTML = list.map(m => `
-    <div class="card menu-card mb-2 shadow-sm">
-      <div class="card-body d-flex gap-3 p-2">
-        <img src="${m.photoUrl}" alt="">
-        <div class="flex-fill">
-          <div class="d-flex gap-1 mb-1">
-            ${m.tags.map(t => `<span class="badge text-bg-warning tag-badge">${t}</span>`).join('')}
-          </div>
-          <strong>${m.name}</strong>
-          <p class="small text-muted mb-1">${m.description || ''}</p>
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold">${m.price} ₸</span>
-            <button class="btn btn-sm btn-accent" data-add="${m.id}">
-              <i class="bi bi-plus-lg"></i></button>
-          </div>
-        </div>
+    <article class="dish">
+      <div class="dish__media">
+        <img src="${m.photoUrl}" loading="lazy" alt="">
+        ${m.tags.length ? `<div class="dish__tags">${m.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+        <button class="dish__add" data-add="${m.id}" aria-label="Добавить"><i class="bi bi-plus-lg"></i></button>
       </div>
-    </div>`).join('');
+      <div class="dish__body">
+        <h3 class="dish__name">${m.name}</h3>
+        ${m.description ? `<p class="dish__desc">${m.description}</p>` : ''}
+        <div class="dish__price">${m.price} ₸</div>
+      </div>
+    </article>`).join('');
 
   document.querySelectorAll('#menuList [data-add]').forEach(btn =>
     btn.addEventListener('click', () => addToCart(btn.dataset.add)));
@@ -194,12 +188,12 @@ function renderCartItems() {
   const entries = Object.entries(state.cart);
   if (!entries.length) { box.innerHTML = '<p class="text-muted">Корзина пуста</p>'; return; }
   box.innerHTML = entries.map(([id, c]) => `
-    <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
       <div><strong>${c.item.name}</strong><br><small class="text-muted">${c.item.price} ₸</small></div>
-      <div class="btn-group btn-group-sm">
-        <button class="btn btn-outline-secondary" data-dec="${id}">−</button>
-        <span class="btn btn-light disabled">${c.qty}</span>
-        <button class="btn btn-outline-secondary" data-inc="${id}">+</button>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-ghost btn-sm px-3" data-dec="${id}">−</button>
+        <strong style="min-width:18px;text-align:center">${c.qty}</strong>
+        <button class="btn btn-ghost btn-sm px-3" data-inc="${id}">+</button>
       </div>
     </div>`).join('');
   box.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => changeQty(b.dataset.inc, 1));
@@ -398,15 +392,13 @@ async function loadOrders() {
 
   // Блок реферальной программы — всегда наверху вкладки
   const refBlock = `
-    <div class="card mb-3 border-warning shadow-sm">
-      <div class="card-body p-3">
-        <h6 class="mb-1"><i class="bi bi-gift"></i> Приглашайте друзей</h6>
-        <p class="small text-muted mb-2">Друг вводит ваш промокод при регистрации — вы получаете 10% бонусами с каждого его заказа.</p>
-        <div class="d-flex gap-2">
-          <input class="form-control text-center fw-bold" value="${state.user.referralCode}" readonly>
-          <button class="btn btn-outline-secondary" id="copyRefBtn" title="Скопировать"><i class="bi bi-clipboard"></i></button>
-          <button class="btn btn-success" id="shareRefBtn" title="Поделиться"><i class="bi bi-whatsapp"></i></button>
-        </div>
+    <div class="ref-card">
+      <h6 class="mb-1"><i class="bi bi-gift"></i> Приглашайте друзей</h6>
+      <p class="small text-muted mb-2">Друг вводит ваш промокод при регистрации — вы получаете бонусами с каждого его заказа.</p>
+      <div class="d-flex gap-2">
+        <input class="form-control text-center fw-bold" value="${state.user.referralCode}" readonly>
+        <button class="btn btn-ghost" id="copyRefBtn" title="Скопировать"><i class="bi bi-clipboard"></i></button>
+        <button class="btn btn-wa" id="shareRefBtn" title="Поделиться"><i class="bi bi-whatsapp"></i></button>
       </div>
     </div>`;
 
@@ -418,18 +410,18 @@ async function loadOrders() {
     const ordersHtml = !orders.length
       ? '<p class="text-muted">Заказов пока нет</p>'
       : orders.map(o => `
-        <div class="card mb-2 shadow-sm"><div class="card-body p-3">
-          <div class="d-flex justify-content-between">
+        <div class="order-card">
+          <div class="d-flex justify-content-between align-items-center mb-1">
             <strong>${o.orderId}</strong>
-            <span class="badge text-bg-secondary">${o.orderType}</span>
+            <span class="chip">${o.orderType}</span>
           </div>
           <small class="text-muted">${new Date(o.dateTime).toLocaleString('ru-RU')}</small>
-          <div class="small mt-2 mb-1" style="white-space:pre-line">${o.items}</div>
-          <div class="d-flex justify-content-between small">
-            <span>Оплата: ${o.paymentMethod}</span>
-            <strong>${o.totalSum - o.bonusesUsed} ₸</strong>
+          <div class="small mt-2 mb-2" style="white-space:pre-line">${o.items}</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="small text-muted">Оплата: ${o.paymentMethod}</span>
+            <strong>${o.totalSum - o.bonusesUsed - (o.discount || 0)} ₸</strong>
           </div>
-        </div></div>`).join('');
+        </div>`).join('');
     box.innerHTML = refBlock + ordersHtml;
     bindReferralButtons();
   } catch (e) {
