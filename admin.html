@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Админка · Креветка Уральск</title>
+  <title>Админка · Вкусно тут</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <style>
     :root{ --bg:#F5F5F7; --surface:#fff; --ink:#1C1C1E; --soft:#6E6E73; --line:#E8E8ED;
@@ -205,7 +205,7 @@
           'box-shadow:0 8px 24px rgba(0,0,0,.25)';
         document.body.appendChild(toast);
       }
-      toast.textContent = '🔔 Новый заказ' + (n > 1 ? ' (' + n + ')' : '') + '!';
+      toast.textContent = '\u{1F514} Новый заказ' + (n > 1 ? ' (' + n + ')' : '') + '!';
       toast.style.display = 'block';
       clearTimeout(toast._t);
       toast._t = setTimeout(() => { toast.style.display = 'none'; }, 6000);
@@ -289,14 +289,14 @@
     function card(o) {
       const color = STCOLOR[o.status] || '#8A8A8E';
       const opts = STATUSES.map(s => `<option ${s===o.status?'selected':''}>${s}</option>`).join('');
-      return `<div class="card" data-id="${o.orderId}">
+      return `<div class="card" data-id="${o.orderId}" data-phone="${o.phone}">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div><span class="qnum">#${o.queue}</span> <strong>${o.name || o.phone}</strong></div>
           <span class="chip" style="background:${color}1a;color:${color}">${o.status}</span>
         </div>
         <div class="muted">${o.timeStr} · ${o.type} · ${o.payment}</div>
         <div style="white-space:pre-line;margin:8px 0;font-size:14px">${o.items}</div>
-        ${o.preorderTime ? `<div class="muted">📅 Предзаказ на: ${String(o.preorderTime).replace('T',' ')}</div>` : ''}
+        ${o.preorderTime ? `<div class="muted">\u{1F4C5} Предзаказ на: ${String(o.preorderTime).replace('T',' ')}</div>` : ''}
         <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0">
           <a class="link" href="https://wa.me/${String(o.phone).replace(/\D/g,'')}" target="_blank"><i class="bi bi-whatsapp"></i> ${o.phone}</a>
           <strong>${o.total - o.bonusesUsed - (o.discount||0)} ₸</strong>
@@ -305,24 +305,41 @@
           <select class="inp js-status">${opts}</select>
           <input class="inp js-time" placeholder="Время доставки" value="${o.deliveryTime||''}">
         </div>
-        <button class="btn btn-accent js-save" style="width:100%;margin-top:8px">Сохранить</button>
+        <div class="row2" style="margin-top:8px">
+          <button class="btn btn-accent js-save">Сохранить</button>
+          <button class="btn btn-wa js-notify"><i class="bi bi-whatsapp"></i> Уведомить</button>
+        </div>
       </div>`;
     }
 
     function bindOrderControls() {
       document.querySelectorAll('#ordersBox .card').forEach(c => {
-        const btn = c.querySelector('.js-save'); if (!btn) return;
-        btn.onclick = async () => {
-          btn.textContent = 'Сохраняю...'; btn.disabled = true;
+        const saveBtn = c.querySelector('.js-save');
+        const notifyBtn = c.querySelector('.js-notify');
+        if (!saveBtn) return;
+
+        // Сохранить статус и время доставки
+        saveBtn.onclick = async () => {
+          saveBtn.textContent = 'Сохраняю...'; saveBtn.disabled = true;
           try {
             await api('adminUpdateOrder', {
               orderId: c.dataset.id,
               status: c.querySelector('.js-status').value,
               deliveryTime: c.querySelector('.js-time').value
             });
-            btn.textContent = 'Сохранено ✓';
-            setTimeout(loadOrders, 600);
-          } catch (e) { alert(e.message); btn.textContent = 'Сохранить'; btn.disabled = false; }
+            saveBtn.textContent = 'Сохранено \u2713';
+            setTimeout(() => loadOrders(), 600);
+          } catch (e) { alert(e.message); saveBtn.textContent = 'Сохранить'; saveBtn.disabled = false; }
+        };
+
+        // Уведомить клиента в WhatsApp о статусе и времени доставки (отправляет админ в один тап)
+        if (notifyBtn) notifyBtn.onclick = () => {
+          const status = c.querySelector('.js-status').value;
+          const time = c.querySelector('.js-time').value;
+          const phone = String(c.dataset.phone).replace(/\D/g, '');
+          let msg = `Здравствуйте! Ваш заказ ${c.dataset.id}: статус «${status}».`;
+          if (time) msg += ` Время доставки: ${time}.`;
+          window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
         };
       });
     }
@@ -350,7 +367,7 @@
           MaxBonusSpendPercent: Number(cfgMaxSpend.value), ReferralPercent: Number(cfgRefPct.value),
           ReferralDays: Number(cfgRefDays.value)
         });
-        msg.style.color = 'var(--wa)'; msg.textContent = 'Сохранено ✓';
+        msg.style.color = 'var(--wa)'; msg.textContent = 'Сохранено \u2713';
       } catch (e) { msg.style.color = 'var(--accent2)'; msg.textContent = e.message; }
     };
 
