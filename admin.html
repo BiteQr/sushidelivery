@@ -123,9 +123,10 @@
     </div>
   </div>
 
+  <script src="config.js"></script>
   <script>
-    // !!! ВСТАВЬТЕ ТОТ ЖЕ URL, ЧТО И В app.js !!!
-    const API_URL = 'https://script.google.com/macros/s/AKfycbzc2BrNjTwEBtsMIU-j9TNaiAFbc13jq9jBkXxKW6UWbMfBMnI5zn2AH6vFL08oOuKk/exec';
+    // Адрес API берётся из config.js (window.API_URL). Менять адрес — только там.
+    const API_URL = window.API_URL || 'https://script.google.com/macros/s/ВАШ_DEPLOY_ID/exec';
 
     let PASS = localStorage.getItem('adminpass') || '';
 
@@ -151,11 +152,63 @@
       localStorage.removeItem('adminpass'); location.reload();
     };
 
+    let knownOrderIds = null; // отслеживание новых заказов
+    let pollStarted = false;
+    let audioCtx;
+
     function showDashboard() {
       document.getElementById('loginScreen').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
-      document.getElementById('orderDate').value = new Date().toISOString().slice(0,10);
+      if (!document.getElementById('orderDate').value)
+        document.getElementById('orderDate').value = new Date().toISOString().slice(0,10);
       loadOrders();
+      startPolling();
+    }
+
+    // Авто-обновление заказов раз в 20 сек (тихо, без мигания), пока открыта вкладка «Заказы»
+    function startPolling() {
+      if (pollStarted) return;
+      pollStarted = true;
+      setInterval(() => {
+        if (document.getElementById('dashboard').classList.contains('hidden')) return;
+        if (document.getElementById('tab-orders').classList.contains('hidden')) return;
+        if (document.hidden) return;
+        loadOrders(true); // тихое обновление
+      }, 20000);
+    }
+
+    // Звуковой сигнал о новом заказе
+    function beep() {
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        [0, 0.3].forEach(t => {
+          const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+          o.connect(g); g.connect(audioCtx.destination);
+          o.type = 'sine'; o.frequency.value = 880;
+          g.gain.setValueAtTime(0.001, audioCtx.currentTime + t);
+          g.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + t + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + t + 0.22);
+          o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.24);
+        });
+      } catch (e) {}
+    }
+
+    // Всплывающее уведомление о новом заказе
+    function notifyNewOrder(n) {
+      beep();
+      let toast = document.getElementById('newOrderToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'newOrderToast';
+        toast.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:999;' +
+          'background:var(--accent);color:#fff;padding:12px 20px;border-radius:999px;font-weight:700;' +
+          'box-shadow:0 8px 24px rgba(0,0,0,.25)';
+        document.body.appendChild(toast);
+      }
+      toast.textContent = '🔔 Новый заказ' + (n > 1 ? ' (' + n + ')' : '') + '!';
+      toast.style.display = 'block';
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => { toast.style.display = 'none'; }, 6000);
     }
 
     // ---------- ТАБЫ ----------
@@ -168,18 +221,28 @@
     });
 
     // ---------- ЗАКАЗЫ ----------
-    document.getElementById('refreshOrders').onclick = loadOrders;
-    document.getElementById('orderDate').onchange = loadOrders;
+    document.getElementById('refreshOrders').onclick = () => loadOrders();
+    document.getElementById('orderDate').onchange = () => { knownOrderIds = null; loadOrders(); };
 
     const STATUSES = ['Новый','Готовится','В пути','Доставлен','Отменён'];
     const STCOLOR = { 'Новый':'#8A8A8E','Готовится':'#E8A317','В пути':'#2F73E8','Доставлен':'#1FAA53','Отменён':'#E2492F' };
 
-    async function loadOrders() {
+    async function loadOrders(silent) {
       const box = document.getElementById('ordersBox');
-      box.innerHTML = '<p class="muted">Загрузка...</p>';
+      if (!silent) box.innerHTML = '<p class="muted">Загрузка...</p>';
       try {
         const date = document.getElementById('orderDate').value;
         const orders = await api('adminOrders', { date });
+
+        // Детект новых заказов (только для сегодняшней даты и не на первой загрузке)
+        const ids = orders.map(o => o.orderId);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (knownOrderIds && date === todayStr) {
+          const fresh = ids.filter(id => !knownOrderIds.has(id));
+          if (fresh.length) notifyNewOrder(fresh.length);
+        }
+        knownOrderIds = new Set(ids);
+
         if (!orders.length) { box.innerHTML = statsCard([]) + '<p class="muted">Заказов на эту дату нет.</p>'; return; }
         const pre = orders.filter(o => o.type === 'Предзаказ');
         const now = orders.filter(o => o.type !== 'Предзаказ');
@@ -187,7 +250,18 @@
           (now.length ? '<div class="sect-title">Очередь</div>' + now.map(card).join('') : '') +
           (pre.length ? '<div class="sect-title">Предзаказы</div>' + pre.map(card).join('') : '');
         bindOrderControls(orders);
-      } catch (e) { box.innerHTML = '<p style="color:var(--accent2)">'+e.message+'</p>'; }
+      } catch (e) {
+        // Неверный пароль → назад к экрану входа. Прочие ошибки (сеть) — не разлогиниваем.
+        if (/пароль/i.test(e.message)) { backToLogin(); return; }
+        if (!silent) box.innerHTML = '<p style="color:var(--accent2)">' + e.message + '</p>';
+      }
+    }
+
+    function backToLogin() {
+      localStorage.removeItem('adminpass'); PASS = '';
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('loginErr').textContent = 'Введите пароль заново';
     }
 
     // Статистика за выбранный день (считается из заказов; отменённые в выручку не идут)
@@ -295,8 +369,9 @@
       } catch (e) { box.innerHTML = '<p style="color:var(--accent2)">'+e.message+'</p>'; }
     };
 
-    // автологин, если пароль уже сохранён
-    if (PASS) { api('adminLogin').then(showDashboard).catch(()=>{ localStorage.removeItem('adminpass'); }); }
+    // Авто-вход: если пароль уже сохранён — сразу открываем панель.
+    // Если пароль окажется неверным, loadOrders сам вернёт на экран входа.
+    if (PASS) showDashboard();
   </script>
 </body>
 </html>
