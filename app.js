@@ -241,7 +241,7 @@ function regularCardHtml(m) {
       </div>
       <div class="dish__body">
         <h3 class="dish__name">${m.name}</h3>
-        ${m.description ? `<p class="dish__desc">${m.description}</p>` : ''}
+        <p class="dish__desc">${m.description || ''}</p>
         <div class="price-pill">${m.price} ₸</div>
       </div>
     </article>`;
@@ -253,7 +253,7 @@ function bigCardHtml(m) {
     <article class="dish dish--big">
       <div class="dish__head">
         <h3 class="dish__name">${m.name}</h3>
-        ${m.description ? `<p class="dish__desc">${m.description}</p>` : ''}
+        <p class="dish__desc">${m.description || ''}</p>
         <div class="price-pill">${m.price} ₸</div>
       </div>
       <div class="dish__media">
