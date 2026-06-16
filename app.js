@@ -201,7 +201,7 @@ function renderMenu() {
   document.getElementById('menuList').innerHTML = list.map(m => `
     <article class="dish">
       <div class="dish__media">
-        <img src="${m.photoUrl}" loading="lazy" alt="">
+        <img src="${m.photoUrl}" loading="lazy" decoding="async" alt="">
         ${m.tags.length ? `<div class="dish__tags">${m.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
         <button class="dish__add" data-add="${m.id}" aria-label="Добавить"><i class="bi bi-plus-lg"></i></button>
       </div>
@@ -421,11 +421,12 @@ async function sendOrder() {
       preorderTime: orderType === 'Предзаказ' ? preorder : ''
     });
 
-    // 2) Формируем красивый текст для администратора
+    // 2) Формируем красивый текст для администратора.
+    //    Эмодзи заданы escape-кодами (\u{...}) — так их не сломает кодировка редактора.
     const lines = items.map(i => `• ${i.name} ×${i.qty} = ${i.price * i.qty}₸`).join('\n');
     const msg =
-      `🛒 *Новый заказ ${res.orderId}*\n` +
-      `👤 ${state.user.name}\n📞 ${state.user.phone}\n🏠 ${state.user.address || '—'}\n\n` +
+      `\u{1F6D2} *Новый заказ ${res.orderId}*\n` +
+      `\u{1F464} ${state.user.name}\n\u{1F4DE} ${state.user.phone}\n\u{1F3E0} ${state.user.address || '—'}\n\n` +
       `${lines}\n\n` +
       `Сумма: ${sum}₸\n` +
       (res.discount ? `Скидка по промокоду ${res.promoCode}: −${res.discount}₸\n` : '') +
