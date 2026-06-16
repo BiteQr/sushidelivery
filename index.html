@@ -41,9 +41,10 @@
       border-bottom:1px solid var(--line);
     }
     .appbar__inner{ display:flex; align-items:center; justify-content:space-between; padding:9px 0; }
-    .brand{ display:flex; flex-direction:column; line-height:1.1; }
-    .brand__name{ font-size:18px; font-weight:800; letter-spacing:-0.03em; }
-    .brand__sub{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+    .brand{ display:flex; flex-direction:row; align-items:center; gap:10px; line-height:1.1; }
+    .brand__logo{ width:38px; height:38px; border-radius:10px; object-fit:cover; }
+    .brand__name{ font-size:18px; font-weight:800; letter-spacing:-0.03em; display:block; }
+    .brand__sub{ font-size:12px; color:var(--ink-soft); margin-top:2px; display:block; }
     .profile-btn{
       border:1px solid var(--line); background:var(--surface); color:var(--ink);
       border-radius:999px; padding:7px 14px; font-size:13px; font-weight:600;
@@ -170,8 +171,11 @@
     <div class="container">
       <div class="appbar__inner">
         <div class="brand">
-          <span class="brand__name">Вкусно тут</span>
-          <span class="brand__sub">Уральск · доставка и самовывоз</span>
+          <img id="brandLogo" class="brand__logo hidden" alt="">
+          <div>
+            <span class="brand__name" id="brandName">Вкусно тут</span>
+            <span class="brand__sub">Уральск · доставка и самовывоз</span>
+          </div>
         </div>
         <button class="profile-btn" id="profileBtn">
           <i class="bi bi-person"></i> <span id="profileLabel">Войти</span>
@@ -225,14 +229,10 @@
             <input id="authName" class="form-control mb-2" placeholder="Имя">
             <input id="authPhone" class="form-control mb-2" placeholder="Телефон, напр. +77001234567">
             <input id="authAddress" class="form-control mb-2" placeholder="Адрес доставки">
+            <input id="authPin" class="form-control mb-2" inputmode="numeric" maxlength="4" placeholder="PIN-код (4 цифры) — для защиты аккаунта">
             <input id="authPromo" class="form-control mb-3" placeholder="Промокод друга (необязательно)">
-            <button class="btn btn-accent w-100" id="authRequestBtn">Получить код</button>
-          </div>
-          <div id="authStep2" class="hidden text-center">
-            <p class="small text-muted">Отправьте код администратору в WhatsApp, затем вернитесь и нажмите «Я отправил код».</p>
-            <a id="waConfirmLink" class="btn btn-wa w-100 mb-2" target="_blank">
-              <i class="bi bi-whatsapp"></i> Подтвердить через WhatsApp</a>
-            <button class="btn btn-accent w-100" id="authConfirmBtn">Я отправил код</button>
+            <button class="btn btn-accent w-100" id="authRequestBtn">Войти / Зарегистрироваться</button>
+            <p class="small text-muted mt-2 mb-0">Новый? PIN создаётся автоматически. Уже регистрировались? Введите свой PIN.</p>
           </div>
         </div>
       </div>
