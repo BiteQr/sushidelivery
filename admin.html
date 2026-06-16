@@ -165,7 +165,7 @@
       startPolling();
     }
 
-    // Авто-обновление заказов раз в 20 сек (тихо, без мигания), пока открыта вкладка «Заказы»
+    // Авто-обновление заказов раз в 10 сек (вместо 20), пока открыта вкладка «Заказы»
     function startPolling() {
       if (pollStarted) return;
       pollStarted = true;
@@ -174,11 +174,20 @@
         if (document.getElementById('tab-orders').classList.contains('hidden')) return;
         if (document.hidden) return;
         loadOrders(true); // тихое обновление
-      }, 20000);
+      }, 10000); // 10 сек вместо 20
     }
 
-    // Звуковой сигнал о новом заказе
-    function beep() {
+    // Браузер-пуш для новых заказов (работает даже если вкладка в фоне)
+    function pushNotify(title, options = {}) {
+      if (!('Notification' in window)) return; // браузер не поддерживает
+      if (Notification.permission === 'granted') {
+        new Notification(title, { icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="%23FB5B43"/><text x="50" y="60" font-size="50" font-weight="bold" fill="white" text-anchor="middle">+</text></svg>', ...options });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') pushNotify(title, options);
+        });
+      }
+    }
       try {
         audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
         [0, 0.3].forEach(t => {
@@ -238,10 +247,16 @@
         const ids = orders.map(o => o.orderId);
         const todayStr = new Date().toISOString().slice(0, 10);
         if (knownOrderIds && date === todayStr) {
-          const fresh = ids.filter(id => !knownOrderIds.has(id));
-          if (fresh.length) notifyNewOrder(fresh.length);
+          const fresh = ids.filter(id => !knownOrderIds.includes(id));
+          if (fresh.length) {
+            notifyNewOrder(fresh.length);
+            pushNotify(\`\u{1F514} Новый заказ\${fresh.length > 1 ? ' (' + fresh.length + ')' : ''}!\`, {
+              tag: 'new-order',
+              requireInteraction: true
+            });
+          }
         }
-        knownOrderIds = new Set(ids);
+        knownOrderIds = ids;
 
         if (!orders.length) { box.innerHTML = statsCard([]) + '<p class="muted">Заказов на эту дату нет.</p>'; return; }
         const pre = orders.filter(o => o.type === 'Предзаказ');
