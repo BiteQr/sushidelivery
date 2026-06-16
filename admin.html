@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Админка · Креветка Уральск</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    :root{ --bg:#F5F5F7; --surface:#fff; --ink:#1C1C1E; --soft:#6E6E73; --line:#E8E8ED;
+           --accent:#FB5B43; --accent2:#E2492F; --wa:#25D366; --radius:16px; }
+    *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif;
+          background:var(--bg); color:var(--ink); padding-bottom:40px; }
+    .wrap{ max-width:760px; margin:0 auto; padding:0 14px; }
+    header{ position:sticky; top:0; z-index:10; background:rgba(245,245,247,.85);
+            backdrop-filter:blur(18px); border-bottom:1px solid var(--line); }
+    .head{ display:flex; align-items:center; justify-content:space-between; padding:12px 0; }
+    .head h1{ font-size:18px; font-weight:800; margin:0; letter-spacing:-.02em; }
+    .tabs{ display:flex; gap:8px; padding:10px 0; overflow-x:auto; }
+    .tab{ border:1px solid var(--line); background:var(--surface); border-radius:999px;
+          padding:8px 16px; font-weight:600; font-size:14px; white-space:nowrap; cursor:pointer; }
+    .tab.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
+    .card{ background:var(--surface); border-radius:var(--radius); padding:14px; margin-bottom:12px;
+           box-shadow:0 1px 2px rgba(0,0,0,.05); }
+    input,select,button{ font-family:inherit; font-size:15px; }
+    .inp{ width:100%; border:1px solid var(--line); border-radius:10px; padding:9px 11px; background:#fff; color:var(--ink); }
+    label{ font-size:12px; color:var(--soft); font-weight:600; display:block; margin:8px 0 3px; }
+    .btn{ border:none; border-radius:12px; padding:11px 16px; font-weight:600; cursor:pointer; }
+    .btn-accent{ background:var(--accent); color:#fff; }
+    .btn-accent:active{ background:var(--accent2); }
+    .btn-ghost{ background:#fff; border:1px solid var(--line); color:var(--ink); }
+    .btn-wa{ background:var(--wa); color:#fff; text-decoration:none; display:inline-block; }
+    .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .chip{ font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; }
+    .muted{ color:var(--soft); font-size:13px; }
+    .qnum{ font-weight:800; font-size:18px; color:var(--accent); }
+    .sect-title{ font-size:13px; font-weight:700; color:var(--soft); text-transform:uppercase;
+                 letter-spacing:.04em; margin:18px 0 8px; }
+    .hidden{ display:none !important; }
+    table{ width:100%; border-collapse:collapse; font-size:14px; }
+    td,th{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
+    a.link{ color:var(--accent); }
+  </style>
+</head>
+<body>
+
+  <!-- ЭКРАН ВХОДА -->
+  <div id="loginScreen" class="wrap" style="padding-top:80px">
+    <div class="card">
+      <h1 style="margin-bottom:12px">Вход в админку</h1>
+      <label>Пароль</label>
+      <input id="passInput" class="inp" type="password" placeholder="Пароль администратора">
+      <button class="btn btn-accent w-100" id="loginBtn" style="width:100%;margin-top:12px">Войти</button>
+      <div id="loginErr" class="muted" style="color:var(--accent2);margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- ПАНЕЛЬ -->
+  <div id="dashboard" class="hidden">
+    <header>
+      <div class="wrap">
+        <div class="head">
+          <h1>Админка</h1>
+          <button class="btn btn-ghost" id="logoutBtn"><i class="bi bi-box-arrow-right"></i></button>
+        </div>
+        <div class="tabs">
+          <div class="tab active" data-tab="orders">Заказы</div>
+          <div class="tab" data-tab="config">Настройки</div>
+          <div class="tab" data-tab="winback">Рассылка</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap" style="padding-top:14px">
+
+      <!-- ЗАКАЗЫ -->
+      <section id="tab-orders">
+        <div class="card" style="display:flex;gap:10px;align-items:center;justify-content:space-between">
+          <div style="flex:1">
+            <label style="margin:0">Дата</label>
+            <input id="orderDate" class="inp" type="date">
+          </div>
+          <button class="btn btn-accent" id="refreshOrders" style="align-self:flex-end"><i class="bi bi-arrow-clockwise"></i> Обновить</button>
+        </div>
+        <div id="ordersBox"></div>
+      </section>
+
+      <!-- НАСТРОЙКИ -->
+      <section id="tab-config" class="hidden">
+        <div class="card">
+          <label>Название бренда</label><input id="cfgBrandName" class="inp">
+          <label>Ссылка на логотип (URL картинки)</label><input id="cfgLogoUrl" class="inp" placeholder="https://...">
+          <label>WhatsApp админа (только цифры)</label><input id="cfgAdminWhatsApp" class="inp" placeholder="77001234567">
+          <div class="row2">
+            <div><label>Работаем с</label><input id="cfgWorkStart" class="inp" placeholder="10:00"></div>
+            <div><label>Работаем до</label><input id="cfgWorkEnd" class="inp" placeholder="23:00"></div>
+          </div>
+          <div class="row2">
+            <div><label>Приветственный бонус (₸)</label><input id="cfgWelcome" class="inp" type="number"></div>
+            <div><label>Кэшбэк (доля, 0.05=5%)</label><input id="cfgCashback" class="inp" type="number" step="0.01"></div>
+          </div>
+          <div class="row2">
+            <div><label>Макс. списание бонусов (0.30=30%)</label><input id="cfgMaxSpend" class="inp" type="number" step="0.01"></div>
+            <div><label>Реферал. процент (0.10=10%)</label><input id="cfgRefPct" class="inp" type="number" step="0.01"></div>
+          </div>
+          <label>Реферал. срок, дней (0 = без ограничения)</label><input id="cfgRefDays" class="inp" type="number">
+          <button class="btn btn-accent" id="saveConfig" style="width:100%;margin-top:14px">Сохранить настройки</button>
+          <div id="cfgMsg" class="muted" style="margin-top:8px"></div>
+        </div>
+      </section>
+
+      <!-- РАССЫЛКА -->
+      <section id="tab-winback" class="hidden">
+        <div class="card">
+          <p class="muted" style="margin-top:0">Найдём клиентов, которые давно не заказывали. Жмите ссылку — WhatsApp откроется с готовым текстом, отправляете вручную (бесплатно).</p>
+          <label>Не заказывали дней</label>
+          <input id="wbDays" class="inp" type="number" value="7">
+          <button class="btn btn-accent" id="genWinback" style="width:100%;margin-top:12px">Сгенерировать список</button>
+          <div id="winbackBox" style="margin-top:14px"></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script>
+    // !!! ВСТАВЬТЕ ТОТ ЖЕ URL, ЧТО И В app.js !!!
+    const API_URL = 'https://script.google.com/macros/s/ВАШ_DEPLOY_ID/exec';
+
+    let PASS = localStorage.getItem('adminpass') || '';
+
+    // POST без Content-Type — чтобы не было CORS-preflight
+    async function api(action, payload={}) {
+      const res = await fetch(API_URL, { method:'POST',
+        body: JSON.stringify(Object.assign({ action, password: PASS }, payload)) });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error);
+      return j.data;
+    }
+
+    // ---------- ВХОД ----------
+    document.getElementById('loginBtn').onclick = async () => {
+      PASS = document.getElementById('passInput').value.trim();
+      try {
+        await api('adminLogin');
+        localStorage.setItem('adminpass', PASS);
+        showDashboard();
+      } catch (e) { document.getElementById('loginErr').textContent = e.message; }
+    };
+    document.getElementById('logoutBtn').onclick = () => {
+      localStorage.removeItem('adminpass'); location.reload();
+    };
+
+    function showDashboard() {
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      document.getElementById('orderDate').value = new Date().toISOString().slice(0,10);
+      loadOrders();
+    }
+
+    // ---------- ТАБЫ ----------
+    document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      ['orders','config','winback'].forEach(name =>
+        document.getElementById('tab-'+name).classList.toggle('hidden', name !== t.dataset.tab));
+      if (t.dataset.tab === 'config') loadConfig();
+    });
+
+    // ---------- ЗАКАЗЫ ----------
+    document.getElementById('refreshOrders').onclick = loadOrders;
+    document.getElementById('orderDate').onchange = loadOrders;
+
+    const STATUSES = ['Новый','Готовится','В пути','Доставлен','Отменён'];
+    const STCOLOR = { 'Новый':'#8A8A8E','Готовится':'#E8A317','В пути':'#2F73E8','Доставлен':'#1FAA53','Отменён':'#E2492F' };
+
+    async function loadOrders() {
+      const box = document.getElementById('ordersBox');
+      box.innerHTML = '<p class="muted">Загрузка...</p>';
+      try {
+        const date = document.getElementById('orderDate').value;
+        const orders = await api('adminOrders', { date });
+        if (!orders.length) { box.innerHTML = statsCard([]) + '<p class="muted">Заказов на эту дату нет.</p>'; return; }
+        const pre = orders.filter(o => o.type === 'Предзаказ');
+        const now = orders.filter(o => o.type !== 'Предзаказ');
+        box.innerHTML = statsCard(orders) +
+          (now.length ? '<div class="sect-title">Очередь</div>' + now.map(card).join('') : '') +
+          (pre.length ? '<div class="sect-title">Предзаказы</div>' + pre.map(card).join('') : '');
+        bindOrderControls(orders);
+      } catch (e) { box.innerHTML = '<p style="color:var(--accent2)">'+e.message+'</p>'; }
+    }
+
+    // Статистика за выбранный день (считается из заказов; отменённые в выручку не идут)
+    function statsCard(orders) {
+      const active = orders.filter(o => o.status !== 'Отменён');
+      const revenue = active.reduce((s, o) => s + (o.total - o.bonusesUsed - (o.discount || 0)), 0);
+      const count = active.length;
+      const avg = count ? Math.round(revenue / count) : 0;
+      const cancelled = orders.length - active.length;
+      const byType = n => orders.filter(o => o.type === n).length;
+      const done = orders.filter(o => o.status === 'Доставлен').length;
+      const money = n => n.toLocaleString('ru-RU');
+      return `<div class="card" style="background:linear-gradient(135deg,#1C1C1E,#2A2A2E);color:#fff">
+        <div style="display:flex;justify-content:space-between;text-align:center;gap:8px">
+          <div><div style="font-size:23px;font-weight:800">${count}</div><div style="color:#aaa;font-size:12px">заказов</div></div>
+          <div><div style="font-size:23px;font-weight:800">${money(revenue)} ₸</div><div style="color:#aaa;font-size:12px">выручка</div></div>
+          <div><div style="font-size:23px;font-weight:800">${money(avg)} ₸</div><div style="color:#aaa;font-size:12px">средний чек</div></div>
+        </div>
+        <div style="color:#aaa;margin-top:10px;text-align:center;font-size:12px">
+          Доставка ${byType('Доставка')} · Самовывоз ${byType('Самовывоз')} · Предзаказ ${byType('Предзаказ')} · Доставлено ${done}${cancelled ? ' · Отменено ' + cancelled : ''}
+        </div>
+      </div>`;
+    }
+
+    function card(o) {
+      const color = STCOLOR[o.status] || '#8A8A8E';
+      const opts = STATUSES.map(s => `<option ${s===o.status?'selected':''}>${s}</option>`).join('');
+      return `<div class="card" data-id="${o.orderId}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><span class="qnum">#${o.queue}</span> <strong>${o.name || o.phone}</strong></div>
+          <span class="chip" style="background:${color}1a;color:${color}">${o.status}</span>
+        </div>
+        <div class="muted">${o.timeStr} · ${o.type} · ${o.payment}</div>
+        <div style="white-space:pre-line;margin:8px 0;font-size:14px">${o.items}</div>
+        ${o.preorderTime ? `<div class="muted">📅 Предзаказ на: ${String(o.preorderTime).replace('T',' ')}</div>` : ''}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0">
+          <a class="link" href="https://wa.me/${String(o.phone).replace(/\D/g,'')}" target="_blank"><i class="bi bi-whatsapp"></i> ${o.phone}</a>
+          <strong>${o.total - o.bonusesUsed - (o.discount||0)} ₸</strong>
+        </div>
+        <div class="row2">
+          <select class="inp js-status">${opts}</select>
+          <input class="inp js-time" placeholder="Время доставки" value="${o.deliveryTime||''}">
+        </div>
+        <button class="btn btn-accent js-save" style="width:100%;margin-top:8px">Сохранить</button>
+      </div>`;
+    }
+
+    function bindOrderControls() {
+      document.querySelectorAll('#ordersBox .card').forEach(c => {
+        const btn = c.querySelector('.js-save'); if (!btn) return;
+        btn.onclick = async () => {
+          btn.textContent = 'Сохраняю...'; btn.disabled = true;
+          try {
+            await api('adminUpdateOrder', {
+              orderId: c.dataset.id,
+              status: c.querySelector('.js-status').value,
+              deliveryTime: c.querySelector('.js-time').value
+            });
+            btn.textContent = 'Сохранено ✓';
+            setTimeout(loadOrders, 600);
+          } catch (e) { alert(e.message); btn.textContent = 'Сохранить'; btn.disabled = false; }
+        };
+      });
+    }
+
+    // ---------- НАСТРОЙКИ ----------
+    async function loadConfig() {
+      try {
+        const c = await api('adminGetConfig');
+        cfgBrandName.value = c.BrandName; cfgLogoUrl.value = c.LogoUrl;
+        cfgAdminWhatsApp.value = c.AdminWhatsApp;
+        cfgWorkStart.value = c.WorkHoursStart; cfgWorkEnd.value = c.WorkHoursEnd;
+        cfgWelcome.value = c.WelcomeBonus; cfgCashback.value = c.CashbackPercent;
+        cfgMaxSpend.value = c.MaxBonusSpendPercent; cfgRefPct.value = c.ReferralPercent;
+        cfgRefDays.value = c.ReferralDays;
+      } catch (e) { alert(e.message); }
+    }
+    document.getElementById('saveConfig').onclick = async () => {
+      const msg = document.getElementById('cfgMsg');
+      try {
+        await api('adminSaveConfig', {
+          BrandName: cfgBrandName.value, LogoUrl: cfgLogoUrl.value,
+          AdminWhatsApp: cfgAdminWhatsApp.value,
+          WorkHoursStart: cfgWorkStart.value, WorkHoursEnd: cfgWorkEnd.value,
+          WelcomeBonus: Number(cfgWelcome.value), CashbackPercent: Number(cfgCashback.value),
+          MaxBonusSpendPercent: Number(cfgMaxSpend.value), ReferralPercent: Number(cfgRefPct.value),
+          ReferralDays: Number(cfgRefDays.value)
+        });
+        msg.style.color = 'var(--wa)'; msg.textContent = 'Сохранено ✓';
+      } catch (e) { msg.style.color = 'var(--accent2)'; msg.textContent = e.message; }
+    };
+
+    // ---------- РАССЫЛКА ----------
+    document.getElementById('genWinback').onclick = async () => {
+      const box = document.getElementById('winbackBox');
+      box.innerHTML = '<p class="muted">Считаю...</p>';
+      try {
+        const list = await api('adminWinback', { days: Number(document.getElementById('wbDays').value) || 7 });
+        if (!list.length) { box.innerHTML = '<p class="muted">Таких клиентов нет.</p>'; return; }
+        box.innerHTML = '<table><tr><th>Имя</th><th>Дней</th><th></th></tr>' +
+          list.map(x => `<tr><td>${x.name}<br><span class="muted">${x.phone}</span></td>
+            <td>${x.lastDays}</td>
+            <td><a class="btn btn-wa" href="${x.link}" target="_blank"><i class="bi bi-whatsapp"></i> Написать</a></td></tr>`).join('') +
+          '</table>';
+      } catch (e) { box.innerHTML = '<p style="color:var(--accent2)">'+e.message+'</p>'; }
+    };
+
+    // автологин, если пароль уже сохранён
+    if (PASS) { api('adminLogin').then(showDashboard).catch(()=>{ localStorage.removeItem('adminpass'); }); }
+  </script>
+</body>
+</html>
