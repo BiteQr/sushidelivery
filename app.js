@@ -49,27 +49,36 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
   loadUserFromStorage();
   bindEvents();
+
+  // 1) Мгновенно показываем из локального кэша прошлой загрузки (сайт не «тупит» на обновлении)
+  const cached = safeJSON(localStorage.getItem('bootstrap'));
+  if (cached) renderBootstrap(cached);
+
+  // 2) Затем подтягиваем свежие данные ОДНИМ запросом
   try {
-    // Грузим параллельно настройки, меню и баннеры
-    const [settings, menu, banners] = await Promise.all([
-      apiGet('getSettings'),
-      apiGet('getMenu'),
-      apiGet('getBanners')
-    ]);
-    state.settings = settings;
-    state.menu = menu;
-    state.banners = banners;
-    applyBranding(settings);
-    showWorkStatus(settings);
-    renderBanners();
-    renderCategories();
-    renderMenu();
+    const data = await apiGet('getBootstrap');
+    localStorage.setItem('bootstrap', JSON.stringify(data));
+    renderBootstrap(data);
     if (state.user) refreshUser(); // обновим баланс
   } catch (e) {
-    alert('Ошибка загрузки: ' + e.message);
+    if (!cached) alert('Ошибка загрузки: ' + e.message);
   }
   updateProfileUI();
 }
+
+// Отрисовать витрину из данных бутстрапа
+function renderBootstrap(data) {
+  state.settings = data.settings;
+  state.menu = data.menu;
+  state.banners = data.banners;
+  applyBranding(data.settings);
+  showWorkStatus(data.settings);
+  renderBanners();
+  renderCategories();
+  renderMenu();
+}
+
+function safeJSON(str) { try { return JSON.parse(str); } catch (e) { return null; } }
 
 // Подставить название и логотип бренда из настроек (меняются в админке)
 function applyBranding(settings) {
@@ -425,10 +434,9 @@ async function sendOrder() {
       `Оплата: ${payment}\nТип: ${orderType}` +
       (orderType === 'Предзаказ' && preorder ? `\nВремя: ${preorder.replace('T', ' ')}` : '');
 
-    // 3) Открываем WhatsApp админа
-    window.open(`https://wa.me/${state.settings.AdminWhatsApp}?text=${encodeURIComponent(msg)}`, '_blank');
+    const waUrl = `https://wa.me/${state.settings.AdminWhatsApp}?text=${encodeURIComponent(msg)}`;
 
-    // 4) Чистим корзину, промокод и обновляем баланс
+    // 3) Чистим корзину, промокод и обновляем баланс
     state.cart = {};
     state.promo = null;
     document.getElementById('promoInput').value = '';
@@ -437,7 +445,10 @@ async function sendOrder() {
     localStorage.setItem('user', JSON.stringify(state.user));
     updateCartUI(); updateProfileUI();
     bootstrap.Modal.getInstance(document.getElementById('cartModal')).hide();
-    alert(`Заказ оформлен! Начислено бонусов: ${res.accrued}₸`);
+
+    // 4) Переходим в WhatsApp. Именно переход (location), а не window.open —
+    //    иначе мобильные браузеры блокируют открытие после ожидания ответа сервера.
+    window.location.href = waUrl;
   } catch (e) {
     alert('Ошибка: ' + e.message);
   } finally {
@@ -477,13 +488,14 @@ async function loadOrders() {
         const st = o.status || 'Новый';
         const color = statusColors[st] || '#8A8A8E';
         const timeInfo = o.deliveryTime
-          ? `<div class="small mt-1"><i class="bi bi-clock"></i> Время доставки: <strong>${o.deliveryTime}</strong></div>`
+          ? `<div style="margin-top:8px;padding:9px 12px;border-radius:12px;background:#FFF4E5;border:1px solid #FFD79A;color:#B26A00;font-weight:600;font-size:14px">
+               <i class="bi bi-clock-fill"></i> Время доставки: ${o.deliveryTime}</div>`
           : (o.preorderTime ? `<div class="small mt-1 text-muted"><i class="bi bi-calendar"></i> Предзаказ на: ${String(o.preorderTime).replace('T',' ')}</div>` : '');
         return `
         <div class="order-card">
           <div class="d-flex justify-content-between align-items-center mb-1">
             <strong>${o.orderId}</strong>
-            <span class="chip" style="background:${color}1a;color:${color}">${st}</span>
+            <span style="background:${color};color:#fff;font-weight:700;font-size:14px;padding:6px 14px;border-radius:999px">${st}</span>
           </div>
           <small class="text-muted">${new Date(o.dateTime).toLocaleString('ru-RU')} · ${o.orderType}</small>
           <div class="small mt-2 mb-2" style="white-space:pre-line">${o.items}</div>
