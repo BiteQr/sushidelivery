@@ -198,12 +198,36 @@ function renderMenu() {
     ? state.menu
     : state.menu.filter(m => m.category === state.activeCategory);
 
-  document.getElementById('menuList').innerHTML = list.map(m => m.bigCard
-    ? bigCardHtml(m)
-    : regularCardHtml(m)).join('');
+  document.getElementById('menuList').innerHTML = list.map(m => {
+    const html = m.bigCard ? bigCardHtml(m) : regularCardHtml(m);
+    // Подменяем плейсхолдер кнопки/инкрементора на нужное
+    const qty = state.cart[m.id]?.qty || 0;
+    const btnHtml = qty === 0
+      ? `<button class="dish__add" data-add="${m.id}" aria-label="Добавить"><i class="bi bi-plus-lg"></i></button>`
+      : `<div class="dish__counter">
+          <button data-minus="${m.id}">−</button>
+          <span>${qty}</span>
+          <button data-plus="${m.id}">+</button>
+        </div>`;
+    return html.replace('<!-- BTN -->', btnHtml);
+  }).join('');
 
+  // Привязываем события
   document.querySelectorAll('#menuList [data-add]').forEach(btn =>
-    btn.addEventListener('click', () => addToCart(btn.dataset.add)));
+    btn.addEventListener('click', () => {
+      addToCart(btn.dataset.add);
+      renderMenu(); // перерисовываем, чтобы кнопка стала инкрементором
+    }));
+  document.querySelectorAll('#menuList [data-plus]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      changeQty(btn.dataset.plus, 1);
+      renderMenu();
+    }));
+  document.querySelectorAll('#menuList [data-minus]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      changeQty(btn.dataset.minus, -1);
+      renderMenu();
+    }));
 }
 
 // Обычная карточка: фото сверху, под ним название, описание, цена-пилюля
@@ -213,7 +237,7 @@ function regularCardHtml(m) {
       <div class="dish__media">
         <img src="${m.photoUrl}" loading="lazy" decoding="async" alt="">
         ${m.tags.length ? `<div class="dish__tags">${m.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
-        <button class="dish__add" data-add="${m.id}" aria-label="Добавить"><i class="bi bi-plus-lg"></i></button>
+        <!-- BTN -->
       </div>
       <div class="dish__body">
         <h3 class="dish__name">${m.name}</h3>
@@ -235,7 +259,7 @@ function bigCardHtml(m) {
       <div class="dish__media">
         <img src="${m.photoUrl}" loading="lazy" decoding="async" alt="">
         ${m.tags.length ? `<div class="dish__tags">${m.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
-        <button class="dish__add" data-add="${m.id}" aria-label="Добавить"><i class="bi bi-plus-lg"></i></button>
+        <!-- BTN -->
       </div>
     </article>`;
 }
