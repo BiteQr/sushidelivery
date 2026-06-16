@@ -5,7 +5,7 @@
 
 // !!! ВСТАВЬТЕ СЮДА URL ВАШЕГО ВЕБ-ПРИЛОЖЕНИЯ GAS (заканчивается на /exec) !!!
 // Адрес API берётся из config.js (window.API_URL). Менять адрес — только там.
-const API_URL = window.API_URL || 'ttps://script.google.com/macros/s/AKfycbzc2BrNjTwEBtsMIU-j9TNaiAFbc13jq9jBkXxKW6UWbMfBMnI5zn2AH6vFL08oOuKk/exec';
+const API_URL = window.API_URL || 'https://script.google.com/macros/s/AKfycbzc2BrNjTwEBtsMIU-j9TNaiAFbc13jq9jBkXxKW6UWbMfBMnI5zn2AH6vFL08oOuKk/exec';
 
 // === ГЛОБАЛЬНОЕ СОСТОЯНИЕ ================================================
 const state = {
