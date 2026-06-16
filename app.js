@@ -4,7 +4,8 @@
  * ========================================================================== */
 
 // !!! ВСТАВЬТЕ СЮДА URL ВАШЕГО ВЕБ-ПРИЛОЖЕНИЯ GAS (заканчивается на /exec) !!!
-const API_URL = 'https://script.google.com/macros/s/AKfycbzc2BrNjTwEBtsMIU-j9TNaiAFbc13jq9jBkXxKW6UWbMfBMnI5zn2AH6vFL08oOuKk/exec';
+// Адрес API берётся из config.js (window.API_URL). Менять адрес — только там.
+const API_URL = window.API_URL || 'ttps://script.google.com/macros/s/AKfycbzc2BrNjTwEBtsMIU-j9TNaiAFbc13jq9jBkXxKW6UWbMfBMnI5zn2AH6vFL08oOuKk/exec';
 
 // === ГЛОБАЛЬНОЕ СОСТОЯНИЕ ================================================
 const state = {
@@ -114,17 +115,45 @@ async function refreshUser() {
   } catch (e) { /* молча */ }
 }
 
-// === РЕНДЕР: БАННЕРЫ =====================================================
+// === РЕНДЕР: БАННЕР-ГЕРОЙ (статичный, переключается стрелками) ============
 function renderBanners() {
   const box = document.getElementById('bannerScroll');
-  box.innerHTML = state.banners.map(b => `
-    <button class="promo" data-banner="${b.id}">
-      <img src="${b.imageUrl}" loading="lazy" alt="">
-      <div class="promo__overlay"><span class="promo__title">${b.title}</span></div>
-    </button>`).join('');
+  if (!state.banners.length) { box.innerHTML = ''; return; }
+  state.bannerIndex = 0;
+  box.innerHTML = `
+    <div class="hero">
+      <div class="hero__img" id="heroImg"></div>
+      <button class="hero__arrow hero__arrow--prev" id="heroPrev" aria-label="Назад"><i class="bi bi-chevron-left"></i></button>
+      <button class="hero__arrow hero__arrow--next" id="heroNext" aria-label="Вперёд"><i class="bi bi-chevron-right"></i></button>
+      <div class="hero__dots" id="heroDots"></div>
+    </div>`;
 
-  box.querySelectorAll('[data-banner]').forEach(el =>
-    el.addEventListener('click', () => openBanner(el.dataset.banner)));
+  // стрелки и точки нужны только если баннеров больше одного
+  const multi = state.banners.length > 1;
+  document.getElementById('heroPrev').classList.toggle('hidden', !multi);
+  document.getElementById('heroNext').classList.toggle('hidden', !multi);
+  document.getElementById('heroPrev').onclick = e => { e.stopPropagation(); changeBanner(-1); };
+  document.getElementById('heroNext').onclick = e => { e.stopPropagation(); changeBanner(1); };
+  renderHero();
+}
+
+function changeBanner(dir) {
+  const n = state.banners.length;
+  state.bannerIndex = (state.bannerIndex + dir + n) % n;
+  renderHero();
+}
+
+function renderHero() {
+  const b = state.banners[state.bannerIndex];
+  const img = document.getElementById('heroImg');
+  img.style.backgroundImage = `url('${b.imageUrl}')`;
+  img.onclick = () => openBanner(b.id);
+  // тёмная подложка с заголовком — только если заголовок задан (для «голой» картинки из Figma не мешает)
+  img.innerHTML = b.title ? `<div class="hero__overlay"><span class="hero__title">${b.title}</span></div>` : '';
+  const dots = document.getElementById('heroDots');
+  if (dots) dots.innerHTML = state.banners.length > 1
+    ? state.banners.map((_, i) => `<span class="hero__dot ${i === state.bannerIndex ? 'is-active' : ''}"></span>`).join('')
+    : '';
 }
 
 // Модалка акции со списком привязанных блюд
