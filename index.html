@@ -111,10 +111,10 @@
     .dish__add:active{ transform:scale(.88); background:var(--accent-press); }
     /* Инкрементор: замена кнопке + когда позиция в корзине */
     .dish__counter{ position:absolute; right:10px; bottom:10px; z-index:2;
-      background:var(--accent); color:#fff; border-radius:8px; padding:3px 4px;
-      display:flex; align-items:center; gap:3px; font-weight:700; font-size:13px; }
-    .dish__counter button{ width:24px; height:24px; border:none; border-radius:5px;
-      background:rgba(255,255,255,.25); color:#fff; font-weight:700; font-size:12px;
+      background:var(--accent); color:#fff; border-radius:10px; padding:5px 6px;
+      display:flex; align-items:center; gap:6px; font-weight:700; font-size:15px; }
+    .dish__counter button{ width:32px; height:32px; border:none; border-radius:6px;
+      background:rgba(255,255,255,.25); color:#fff; font-weight:700; font-size:18px;
       display:grid; place-items:center; cursor:pointer; transition:background .1s; }
     .dish__counter button:active{ background:rgba(255,255,255,.5); }
     .dish__body{ padding:11px 13px 14px; display:flex; flex-direction:column; gap:3px; flex:1; }
@@ -129,7 +129,7 @@
     .dish--big .dish__head{ padding:14px 14px 10px; display:flex; flex-direction:column; gap:5px; }
     .dish--big .dish__name{ color:var(--accent); text-transform:uppercase; font-weight:800;
       font-size:16px; letter-spacing:.01em; }
-    .dish--big .dish__desc{ -webkit-line-clamp:3; font-size:13px; }
+    .dish--big .dish__desc{ -webkit-line-clamp:2; font-size:13px; min-height:32px; max-height:40px; }
     .dish--big .price-pill{ margin-top:2px; font-size:15px; padding:7px 18px; }
     .dish--big .dish__media{ aspect-ratio:4/3; }
 
