@@ -109,6 +109,14 @@
       box-shadow:var(--shadow); display:grid; place-items:center; font-size:17px;
       transition:transform .12s; z-index:2; }
     .dish__add:active{ transform:scale(.88); background:var(--accent-press); }
+    /* Инкрементор: замена кнопке + когда позиция в корзине */
+    .dish__counter{ position:absolute; right:10px; bottom:10px; z-index:2;
+      background:var(--accent); color:#fff; border-radius:8px; padding:3px 4px;
+      display:flex; align-items:center; gap:3px; font-weight:700; font-size:13px; }
+    .dish__counter button{ width:24px; height:24px; border:none; border-radius:5px;
+      background:rgba(255,255,255,.25); color:#fff; font-weight:700; font-size:12px;
+      display:grid; place-items:center; cursor:pointer; transition:background .1s; }
+    .dish__counter button:active{ background:rgba(255,255,255,.5); }
     .dish__body{ padding:11px 13px 14px; display:flex; flex-direction:column; gap:3px; flex:1; }
     .dish__name{ font-size:15px; font-weight:600; line-height:1.25; margin:0; }
     .dish__desc{ font-size:12.5px; color:var(--ink-soft); margin:0; display:-webkit-box;
@@ -255,8 +263,8 @@
             <input id="authAddress" class="form-control mb-2" placeholder="Адрес доставки">
             <input id="authPin" class="form-control mb-2" inputmode="numeric" maxlength="4" placeholder="PIN-код (4 цифры) — для защиты аккаунта">
             <input id="authPromo" class="form-control mb-3" placeholder="Промокод друга (необязательно)">
-            <button class="btn btn-accent w-100" id="authRequestBtn">Заказать</button>
-            <p class="small text-muted mt-2 mb-0">ВАЖНО! Придумайте свой PIN код для автоматического входа в будущем. Введите свой PIN если уже вводили.</p>
+            <button class="btn btn-accent w-100" id="authRequestBtn">Войти / Зарегистрироваться</button>
+            <p class="small text-muted mt-2 mb-0">Новый? PIN создаётся автоматически. Уже регистрировались? Введите свой PIN.</p>
           </div>
         </div>
       </div>
@@ -298,7 +306,7 @@
           <label class="form-label small fw-bold">Оплата</label>
           <select id="paymentMethod" class="form-select mb-2">
             <option value="Каспи">Каспи</option>
-            <option value="Перевод">Другая карта</option>
+            <option value="Перевод">Перевод</option>
             <option value="Наличные">Наличные</option>
           </select>
 
