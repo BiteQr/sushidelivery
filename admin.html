@@ -156,11 +156,18 @@
     let pollStarted = false;
     let audioCtx;
 
+    // Сегодняшняя дата по МЕСТНОМУ времени в формате YYYY-MM-DD (не по UTC)
+    function todayLocal() {
+      const d = new Date();
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 10);
+    }
+
     function showDashboard() {
       document.getElementById('loginScreen').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
-      if (!document.getElementById('orderDate').value)
-        document.getElementById('orderDate').value = new Date().toISOString().slice(0,10);
+      // всегда выставляем сегодняшнюю дату (браузер иначе подставляет вчерашнюю из кэша формы)
+      document.getElementById('orderDate').value = todayLocal();
       loadOrders();
       startPolling();
     }
@@ -248,7 +255,7 @@
 
         // Детект новых заказов (только для сегодняшней даты и не на первой загрузке)
         const ids = orders.map(o => o.orderId);
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = todayLocal();
         if (knownOrderIds && date === todayStr) {
           const fresh = ids.filter(id => !knownOrderIds.includes(id));
           if (fresh.length) {
