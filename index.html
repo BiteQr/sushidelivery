@@ -133,7 +133,11 @@
 
     /* ---------- Формы / кнопки ---------- */
     .form-control,.form-select{ border-radius:12px; border:1px solid var(--line);
-      padding:.7rem .9rem; font-size:15px; background:var(--surface); color:var(--ink); }
+      padding:.7rem .9rem; font-size:15px; background-color:var(--surface); color:var(--ink); }
+    /* Явная стрелка вниз у выпадающих списков, чтобы было понятно, что это пикер */
+    .form-select{ appearance:none; -webkit-appearance:none; padding-right:2.6rem;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%236E6E73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 6 8 10 12 6'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 14px center; background-size:16px; }
     .form-control:focus,.form-select:focus{ border-color:var(--accent);
       box-shadow:0 0 0 3px rgba(251,91,67,.15); }
     .form-label{ color:var(--ink-soft); }
@@ -238,8 +242,8 @@
             <input id="authAddress" class="form-control mb-2" placeholder="Адрес доставки">
             <input id="authPin" class="form-control mb-2" inputmode="numeric" maxlength="4" placeholder="PIN-код (4 цифры) — для защиты аккаунта">
             <input id="authPromo" class="form-control mb-3" placeholder="Промокод друга (необязательно)">
-            <button class="btn btn-accent w-100" id="authRequestBtn">Войти / Зарегистрироваться</button>
-            <p class="small text-muted mt-2 mb-0">Новый? PIN создаётся автоматически. Уже регистрировались? Введите свой PIN.</p>
+            <button class="btn btn-accent w-100" id="authRequestBtn">ЗАКАЗАТЬ</button>
+            <p class="small text-muted mt-2 mb-0">Придумайте свой PIN код и вы сможете входить в Аккаунт и копить Баллы. Уже регистрировались? Введите свой PIN.</p>
           </div>
         </div>
       </div>
