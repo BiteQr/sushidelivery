@@ -198,7 +198,17 @@ function renderMenu() {
     ? state.menu
     : state.menu.filter(m => m.category === state.activeCategory);
 
-  document.getElementById('menuList').innerHTML = list.map(m => `
+  document.getElementById('menuList').innerHTML = list.map(m => m.bigCard
+    ? bigCardHtml(m)
+    : regularCardHtml(m)).join('');
+
+  document.querySelectorAll('#menuList [data-add]').forEach(btn =>
+    btn.addEventListener('click', () => addToCart(btn.dataset.add)));
+}
+
+// Обычная карточка: фото сверху, под ним название, описание, цена-пилюля
+function regularCardHtml(m) {
+  return `
     <article class="dish">
       <div class="dish__media">
         <img src="${m.photoUrl}" loading="lazy" decoding="async" alt="">
@@ -208,12 +218,26 @@ function renderMenu() {
       <div class="dish__body">
         <h3 class="dish__name">${m.name}</h3>
         ${m.description ? `<p class="dish__desc">${m.description}</p>` : ''}
-        <div class="dish__price">${m.price} ₸</div>
+        <div class="price-pill">${m.price} ₸</div>
       </div>
-    </article>`).join('');
+    </article>`;
+}
 
-  document.querySelectorAll('#menuList [data-add]').forEach(btn =>
-    btn.addEventListener('click', () => addToCart(btn.dataset.add)));
+// Большая карточка (метка BigCard): название оранжевым капсом, описание, пилюля — сверху; крупное фото — снизу
+function bigCardHtml(m) {
+  return `
+    <article class="dish dish--big">
+      <div class="dish__head">
+        <h3 class="dish__name">${m.name}</h3>
+        ${m.description ? `<p class="dish__desc">${m.description}</p>` : ''}
+        <div class="price-pill">${m.price} ₸</div>
+      </div>
+      <div class="dish__media">
+        <img src="${m.photoUrl}" loading="lazy" decoding="async" alt="">
+        ${m.tags.length ? `<div class="dish__tags">${m.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+        <button class="dish__add" data-add="${m.id}" aria-label="Добавить"><i class="bi bi-plus-lg"></i></button>
+      </div>
+    </article>`;
 }
 
 // === КОРЗИНА ============================================================
@@ -323,6 +347,22 @@ async function applyPromo() {
 }
 
 // === АВТОРИЗАЦИЯ (мгновенная, без кода из WhatsApp) =====================
+
+// Форматирование телефона к виду +7 XXX XXX XX XX. 8/7/+7 — сводим к +7.
+function formatPhone(el) {
+  let d = el.value.replace(/\D/g, '');
+  if (d.charAt(0) === '8') d = '7' + d.slice(1);
+  if (d.charAt(0) !== '7') d = '7' + d;
+  d = d.slice(0, 11);                 // 7 + 10 цифр
+  const rest = d.slice(1);
+  let r = '+7';
+  if (rest.length) r += ' ' + rest.slice(0, 3);
+  if (rest.length > 3) r += ' ' + rest.slice(3, 6);
+  if (rest.length > 6) r += ' ' + rest.slice(6, 8);
+  if (rest.length > 8) r += ' ' + rest.slice(8, 10);
+  el.value = r;
+}
+
 async function doRegister() {
   const name = document.getElementById('authName').value.trim();
   const phone = document.getElementById('authPhone').value.trim();
@@ -492,6 +532,11 @@ async function loadOrders() {
           ? `<div style="margin-top:8px;padding:9px 12px;border-radius:12px;background:#FFF4E5;border:1px solid #FFD79A;color:#B26A00;font-weight:600;font-size:14px">
                <i class="bi bi-clock-fill"></i> Время доставки: ${o.deliveryTime}</div>`
           : (o.preorderTime ? `<div class="small mt-1 text-muted"><i class="bi bi-calendar"></i> Предзаказ на: ${String(o.preorderTime).replace('T',' ')}</div>` : '');
+        const cashback = (o.bonusesAccrued > 0)
+          ? (st === 'Доставлен'
+              ? `<div class="small mt-1" style="color:#1FAA53"><i class="bi bi-coin"></i> Начислен кэшбэк +${o.bonusesAccrued} ₸</div>`
+              : `<div class="small mt-1 text-muted"><i class="bi bi-coin"></i> Кэшбэк +${o.bonusesAccrued} ₸ после доставки</div>`)
+          : '';
         return `
         <div class="order-card">
           <div class="d-flex justify-content-between align-items-center mb-1">
@@ -501,6 +546,7 @@ async function loadOrders() {
           <small class="text-muted">${new Date(o.dateTime).toLocaleString('ru-RU')} · ${o.orderType}</small>
           <div class="small mt-2 mb-2" style="white-space:pre-line">${o.items}</div>
           ${timeInfo}
+          ${cashback}
           <div class="d-flex justify-content-between align-items-center mt-2">
             <strong>${o.totalSum - o.bonusesUsed - (o.discount || 0)} ₸</strong>
             <button class="btn btn-ghost btn-sm" data-repeat="${idx}"><i class="bi bi-arrow-repeat"></i> Повторить</button>
@@ -576,6 +622,11 @@ function bindEvents() {
 
   // авторизация (один шаг)
   document.getElementById('authRequestBtn').addEventListener('click', doRegister);
+
+  // телефон: всегда начинается с +7, пользователь дописывает остальное
+  const phoneEl = document.getElementById('authPhone');
+  phoneEl.addEventListener('focus', () => { if (!phoneEl.value.trim()) phoneEl.value = '+7 '; });
+  phoneEl.addEventListener('input', () => formatPhone(phoneEl));
 
   // корзина: открытие модалки
   document.getElementById('cartModal').addEventListener('show.bs.modal', () => {
