@@ -40,6 +40,29 @@
     table{ width:100%; border-collapse:collapse; font-size:14px; }
     td,th{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
     a.link{ color:var(--accent); }
+
+    /* ---------- Канбан-доска заказов ---------- */
+    .kanban{ display:flex; gap:12px; overflow-x:auto; padding:4px 2px 10px;
+      -webkit-overflow-scrolling:touch; scroll-snap-type:x proximity; }
+    .kanban::-webkit-scrollbar{ height:8px; }
+    .kanban::-webkit-scrollbar-thumb{ background:#d2d2d8; border-radius:8px; }
+    .kanban__col{ flex:0 0 300px; background:#ECECF1; border-radius:14px; padding:10px;
+      display:flex; flex-direction:column; max-height:calc(100vh - 250px); scroll-snap-align:start; }
+    .kanban__head{ display:flex; justify-content:space-between; align-items:center;
+      font-weight:800; font-size:14px; padding:2px 4px 10px; text-transform:uppercase; letter-spacing:.02em; }
+    .kanban__count{ background:#fff; color:var(--ink); border-radius:999px; min-width:24px;
+      text-align:center; padding:1px 8px; font-size:13px; }
+    .kanban__cards{ overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:2px; }
+    .kanban__empty{ color:#aaa; font-size:13px; text-align:center; padding:14px 0; }
+    .kard{ margin:0; }
+    .kard__pre{ background:#FFF4E5; border:1px solid #FFD79A; color:#B26A00;
+      border-radius:8px; padding:5px 8px; font-size:12.5px; font-weight:600; margin-bottom:6px; }
+
+    /* Мобильная версия: колонки шире (видно одну + край следующей), листаются вбок */
+    @media(max-width:600px){
+      .kanban__col{ flex:0 0 86%; max-height:none; }
+      .kanban__cards{ overflow:visible; }
+    }
   </style>
 </head>
 <body>
@@ -243,10 +266,11 @@
 
     // ---------- ЗАКАЗЫ ----------
     document.getElementById('refreshOrders').onclick = () => loadOrders();
-    document.getElementById('orderDate').onchange = () => { knownOrderIds = null; loadOrders(); };
+    document.getElementById('orderDate').onchange = () => { knownOrderIds = null; lastRenderHash = ''; loadOrders(); };
 
     const STATUSES = ['Новый','Готовится','В пути','Доставлен','Отменён'];
     const STCOLOR = { 'Новый':'#8A8A8E','Готовится':'#E8A317','В пути':'#2F73E8','Доставлен':'#1FAA53','Отменён':'#E2492F' };
+    let lastRenderHash = ''; // чтобы не перерисовывать доску, если ничего не изменилось
 
     async function loadOrders(silent) {
       const box = document.getElementById('ordersBox');
@@ -270,13 +294,43 @@
         }
         knownOrderIds = ids;
 
-        if (!orders.length) { box.innerHTML = statsCard([]) + '<p class="muted">Заказов на эту дату нет.</p>'; return; }
-        const pre = orders.filter(o => o.type === 'Предзаказ');
-        const now = orders.filter(o => o.type !== 'Предзаказ');
-        box.innerHTML = statsCard(orders) +
-          (now.length ? '<div class="sect-title">Очередь</div>' + now.map(card).join('') : '') +
-          (pre.length ? '<div class="sect-title">Предзаказы</div>' + pre.map(card).join('') : '');
+        // Если ничего видимого не изменилось — НЕ трогаем DOM (без миганий и прыжков прокрутки)
+        const hash = JSON.stringify(orders.map(o => [o.orderId, o.status, o.deliveryTime]));
+        if (silent && hash === lastRenderHash) return;
+        lastRenderHash = hash;
+
+        // Запоминаем позиции прокрутки (страница + горизонталь доски)
+        const sy = window.scrollY;
+        const oldBoard = document.getElementById('kanban');
+        const sx = oldBoard ? oldBoard.scrollLeft : 0;
+
+        if (!orders.length) {
+          box.innerHTML = statsCard([]) + '<p class="muted">Заказов на эту дату нет.</p>';
+          return;
+        }
+
+        // Раскладываем заказы по колонкам-статусам
+        const byStatus = {};
+        STATUSES.forEach(s => byStatus[s] = []);
+        orders.forEach(o => { (byStatus[o.status] || byStatus['Новый']).push(o); });
+
+        const cols = STATUSES.map(s => `
+          <div class="kanban__col">
+            <div class="kanban__head" style="color:${STCOLOR[s]}">
+              <span>${s}</span><span class="kanban__count">${byStatus[s].length}</span>
+            </div>
+            <div class="kanban__cards">
+              ${byStatus[s].map(card).join('') || '<div class="kanban__empty">пусто</div>'}
+            </div>
+          </div>`).join('');
+
+        box.innerHTML = statsCard(orders) + `<div class="kanban" id="kanban">${cols}</div>`;
         bindOrderControls(orders);
+
+        // Возвращаем прокрутку на место
+        window.scrollTo(0, sy);
+        const newBoard = document.getElementById('kanban');
+        if (newBoard) newBoard.scrollLeft = sx;
       } catch (e) {
         // Неверный пароль → назад к экрану входа. Прочие ошибки (сеть) — не разлогиниваем.
         if (/пароль/i.test(e.message)) { backToLogin(); return; }
@@ -314,27 +368,24 @@
     }
 
     function card(o) {
-      const color = STCOLOR[o.status] || '#8A8A8E';
       const opts = STATUSES.map(s => `<option ${s===o.status?'selected':''}>${s}</option>`).join('');
-      return `<div class="card" data-id="${o.orderId}" data-phone="${o.phone}">
-        <div style="display:flex;justify-content:space-between;align-items:center">
+      const isPre = o.type === 'Предзаказ';
+      return `<div class="card kard" data-id="${o.orderId}" data-phone="${o.phone}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
           <div><span class="qnum">#${o.queue}</span> <strong>${o.name || o.phone}</strong></div>
-          <span class="chip" style="background:${color}1a;color:${color}">${o.status}</span>
+          <strong style="white-space:nowrap">${o.total - o.bonusesUsed - (o.discount||0)} ₸</strong>
         </div>
         <div class="muted">${o.timeStr} · ${o.type} · ${o.payment}</div>
-        <div style="white-space:pre-line;margin:8px 0;font-size:14px">${o.items}</div>
-        ${o.preorderTime ? `<div class="muted">\u{1F4C5} Предзаказ на: ${String(o.preorderTime).replace('T',' ')}</div>` : ''}
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0">
-          <a class="link" href="https://wa.me/${String(o.phone).replace(/\D/g,'')}" target="_blank"><i class="bi bi-whatsapp"></i> ${o.phone}</a>
-          <strong>${o.total - o.bonusesUsed - (o.discount||0)} ₸</strong>
-        </div>
-        <div class="row2">
-          <select class="inp js-status">${opts}</select>
-          <input class="inp js-time" placeholder="Время доставки" value="${o.deliveryTime||''}">
-        </div>
+        <div style="white-space:pre-line;margin:7px 0;font-size:13.5px">${o.items}</div>
+        ${isPre && o.preorderTime ? `<div class="kard__pre">\u{1F4C5} Предзаказ: ${String(o.preorderTime).replace('T',' ')}</div>` : ''}
+        <a class="link" href="https://wa.me/${String(o.phone).replace(/\D/g,'')}" target="_blank" style="font-size:13px"><i class="bi bi-whatsapp"></i> ${o.phone}</a>
         <div class="row2" style="margin-top:8px">
+          <select class="inp js-status">${opts}</select>
+          <input class="inp js-time" placeholder="Время дост." value="${o.deliveryTime||''}">
+        </div>
+        <div class="row2" style="margin-top:6px">
           <button class="btn btn-accent js-save">Сохранить</button>
-          <button class="btn btn-wa js-notify"><i class="bi bi-whatsapp"></i> Уведомить</button>
+          <button class="btn btn-wa js-notify"><i class="bi bi-whatsapp"></i></button>
         </div>
       </div>`;
     }
