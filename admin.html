@@ -116,6 +116,12 @@
           <label>WhatsApp админа (только цифры)</label><input id="cfgAdminWhatsApp" class="inp" placeholder="77001234567">
           <label>Telegram: токен бота (из @BotFather)</label><input id="cfgTgToken" class="inp" placeholder="7123456789:AAH...">
           <label>Telegram: chat_id (из getUpdates)</label><input id="cfgTgChatId" class="inp" placeholder="123456789">
+          <label>Режим доставки</label>
+          <select id="cfgDeliveryMode" class="inp">
+            <option value="own">Свои курьеры (платная доставка по зонам)</option>
+            <option value="customer">Клиент оплачивает курьеру / агрегатор</option>
+            <option value="pickup">Только самовывоз</option>
+          </select>
           <div class="row2">
             <div><label>Работаем с</label><input id="cfgWorkStart" class="inp" placeholder="10:00"></div>
             <div><label>Работаем до</label><input id="cfgWorkEnd" class="inp" placeholder="23:00"></div>
@@ -129,6 +135,8 @@
             <div><label>Реферал. процент (0.10=10%)</label><input id="cfgRefPct" class="inp" type="number" step="0.01"></div>
           </div>
           <label>Реферал. срок, дней (0 = без ограничения)</label><input id="cfgRefDays" class="inp" type="number">
+          <label>Бонус на день рождения (₸, 0 = выкл)</label><input id="cfgBdayBonus" class="inp" type="number">
+          <label>Ссылка для отзыва (2ГИС/Google) — для оценок 4-5</label><input id="cfgReviewUrl" class="inp" placeholder="https://2gis.kz/...">
           <button class="btn btn-accent" id="saveConfig" style="width:100%;margin-top:14px">Сохранить настройки</button>
           <div id="cfgMsg" class="muted" style="margin-top:8px"></div>
         </div>
@@ -429,10 +437,13 @@
         cfgBrandName.value = c.BrandName; cfgLogoUrl.value = c.LogoUrl;
         cfgAdminWhatsApp.value = c.AdminWhatsApp;
         cfgTgToken.value = c.TelegramToken || ''; cfgTgChatId.value = c.TelegramChatId || '';
+        cfgDeliveryMode.value = c.DeliveryMode || 'own';
         cfgWorkStart.value = c.WorkHoursStart; cfgWorkEnd.value = c.WorkHoursEnd;
         cfgWelcome.value = c.WelcomeBonus; cfgCashback.value = c.CashbackPercent;
         cfgMaxSpend.value = c.MaxBonusSpendPercent; cfgRefPct.value = c.ReferralPercent;
         cfgRefDays.value = c.ReferralDays;
+        cfgBdayBonus.value = c.BirthdayBonus;
+        cfgReviewUrl.value = c.ReviewUrl || '';
       } catch (e) { alert(e.message); }
     }
     document.getElementById('saveConfig').onclick = async () => {
@@ -442,10 +453,12 @@
           BrandName: cfgBrandName.value, LogoUrl: cfgLogoUrl.value,
           AdminWhatsApp: cfgAdminWhatsApp.value,
           TelegramToken: cfgTgToken.value.trim(), TelegramChatId: cfgTgChatId.value.trim(),
+          DeliveryMode: cfgDeliveryMode.value,
           WorkHoursStart: cfgWorkStart.value, WorkHoursEnd: cfgWorkEnd.value,
           WelcomeBonus: Number(cfgWelcome.value), CashbackPercent: Number(cfgCashback.value),
           MaxBonusSpendPercent: Number(cfgMaxSpend.value), ReferralPercent: Number(cfgRefPct.value),
-          ReferralDays: Number(cfgRefDays.value)
+          ReferralDays: Number(cfgRefDays.value), BirthdayBonus: Number(cfgBdayBonus.value),
+          ReviewUrl: cfgReviewUrl.value.trim()
         });
         msg.style.color = 'var(--wa)'; msg.textContent = 'Сохранено \u2713';
       } catch (e) { msg.style.color = 'var(--accent2)'; msg.textContent = e.message; }
