@@ -91,6 +91,8 @@
           <label>Название бренда</label><input id="cfgBrandName" class="inp">
           <label>Ссылка на логотип (URL картинки)</label><input id="cfgLogoUrl" class="inp" placeholder="https://...">
           <label>WhatsApp админа (только цифры)</label><input id="cfgAdminWhatsApp" class="inp" placeholder="77001234567">
+          <label>Telegram: токен бота (из @BotFather)</label><input id="cfgTgToken" class="inp" placeholder="7123456789:AAH...">
+          <label>Telegram: chat_id (из getUpdates)</label><input id="cfgTgChatId" class="inp" placeholder="123456789">
           <div class="row2">
             <div><label>Работаем с</label><input id="cfgWorkStart" class="inp" placeholder="10:00"></div>
             <div><label>Работаем до</label><input id="cfgWorkEnd" class="inp" placeholder="23:00"></div>
@@ -375,6 +377,7 @@
         const c = await api('adminGetConfig');
         cfgBrandName.value = c.BrandName; cfgLogoUrl.value = c.LogoUrl;
         cfgAdminWhatsApp.value = c.AdminWhatsApp;
+        cfgTgToken.value = c.TelegramToken || ''; cfgTgChatId.value = c.TelegramChatId || '';
         cfgWorkStart.value = c.WorkHoursStart; cfgWorkEnd.value = c.WorkHoursEnd;
         cfgWelcome.value = c.WelcomeBonus; cfgCashback.value = c.CashbackPercent;
         cfgMaxSpend.value = c.MaxBonusSpendPercent; cfgRefPct.value = c.ReferralPercent;
@@ -387,6 +390,7 @@
         await api('adminSaveConfig', {
           BrandName: cfgBrandName.value, LogoUrl: cfgLogoUrl.value,
           AdminWhatsApp: cfgAdminWhatsApp.value,
+          TelegramToken: cfgTgToken.value.trim(), TelegramChatId: cfgTgChatId.value.trim(),
           WorkHoursStart: cfgWorkStart.value, WorkHoursEnd: cfgWorkEnd.value,
           WelcomeBonus: Number(cfgWelcome.value), CashbackPercent: Number(cfgCashback.value),
           MaxBonusSpendPercent: Number(cfgMaxSpend.value), ReferralPercent: Number(cfgRefPct.value),
