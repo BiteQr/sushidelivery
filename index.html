@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Доставка еды</title>
 
+  <!-- PWA: установка на телефон -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FB5B43">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
   <!-- Ускоряем первый запрос к бэкенду: заранее устанавливаем соединение -->
   <link rel="preconnect" href="https://script.google.com" crossorigin>
   <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
@@ -126,6 +134,19 @@
     .price-pill{ align-self:flex-start; margin-top:auto; background:var(--accent); color:#fff;
       font-weight:700; font-size:14px; padding:6px 16px; border-radius:999px; line-height:1.2; }
 
+    /* Допродажа в корзине */
+    .upsell-title{ font-weight:700; font-size:14px; margin:14px 0 8px; }
+    .upsell-row{ display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch; }
+    .upsell-card{ flex:0 0 120px; background:#fff; border:1px solid var(--line); border-radius:14px;
+      overflow:hidden; display:flex; flex-direction:column; }
+    .upsell-card img{ width:100%; height:80px; object-fit:cover; display:block; }
+    .upsell-card .u-body{ padding:7px 9px 9px; display:flex; flex-direction:column; gap:3px; flex:1; }
+    .upsell-card .u-name{ font-size:12.5px; font-weight:600; line-height:1.2;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:30px; }
+    .upsell-card .u-add{ margin-top:auto; border:none; background:var(--accent); color:#fff;
+      font-weight:700; font-size:12.5px; border-radius:999px; padding:5px 0; cursor:pointer; }
+    .upsell-card .u-add:active{ background:var(--accent-press); }
+
     /* ---------- Большая карточка (метка BigCard=TRUE) ---------- */
     .dish--big .dish__head{ padding:12px 12px 8px; display:flex; flex-direction:column; gap:4px; min-height:92px; }
     .dish--big .dish__name{ color:var(--accent); text-transform:uppercase; font-weight:800;
@@ -243,6 +264,13 @@
     <i class="bi bi-bag"></i> <span id="cartCount">0</span> <span class="dot"></span> <span id="cartTotal">0</span> ₸
   </button>
 
+  <!-- Кнопка установки PWA (показывается, когда браузер разрешает установку) -->
+  <button id="installBtn" class="hidden"
+    style="position:fixed;left:12px;bottom:78px;z-index:1040;border:none;background:#1c1c1e;color:#fff;
+           border-radius:999px;padding:10px 16px;font-weight:600;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25)">
+    <i class="bi bi-download"></i> Установить приложение
+  </button>
+
   <!-- ================= НИЖНЕЕ МЕНЮ ================= -->
   <nav class="navbar-bottom">
     <div class="container d-flex">
@@ -255,18 +283,60 @@
   <div class="modal fade" id="authModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
-        <div class="modal-header"><h6 class="modal-title">Вход и регистрация</h6>
+        <div class="modal-header"><h6 class="modal-title" id="authTitle">Вход</h6>
           <button class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
           <div id="authStep1">
-            <input id="authName" class="form-control mb-2" placeholder="Имя">
+            <!-- Поля «первого заказа» — показываются только в режиме регистрации -->
+            <div id="regFields" class="hidden">
+              <input id="authName" class="form-control mb-2" placeholder="Имя">
+            </div>
             <input id="authPhone" class="form-control mb-2" inputmode="tel" placeholder="+7 777 123 45 67">
-            <input id="authAddress" class="form-control mb-2" placeholder="Адрес доставки">
-            <input id="authPin" class="form-control mb-2" inputmode="numeric" maxlength="4" placeholder="PIN-код (4 цифры) — для защиты аккаунта">
-            <input id="authPromo" class="form-control mb-3" placeholder="Промокод друга (необязательно)">
-            <button class="btn btn-accent w-100" id="authRequestBtn">Войти / Зарегистрироваться</button>
-            <p class="small text-muted mt-2 mb-0">Новый? PIN создаётся автоматически. Уже регистрировались? Введите свой PIN.</p>
+            <div id="regFields2" class="hidden">
+              <input id="authAddress" class="form-control mb-2" placeholder="Адрес доставки">
+            </div>
+            <input id="authPin" class="form-control mb-2" inputmode="numeric" maxlength="4" placeholder="PIN-код (4 цифры)">
+            <div id="regFields3" class="hidden">
+              <input id="authPromo" class="form-control mb-2" placeholder="Промокод друга (необязательно)">
+            </div>
+            <button class="btn btn-accent w-100 mt-1" id="authRequestBtn">Войти</button>
+            <p class="small text-muted mt-2 mb-0" id="authHint"></p>
+            <p class="small mt-2 mb-0"><a href="#" id="authToggle" style="color:var(--accent)"></a></p>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= МОДАЛКА: ДЕНЬ РОЖДЕНИЯ ================= -->
+  <div class="modal fade" id="birthdayModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-body text-center">
+          <div style="font-size:40px">🎁</div>
+          <h6 class="mt-2 mb-1">Когда у вас день рождения?</h6>
+          <p class="small text-muted mb-3">Подарим бонусы в этот день — потратите на заказ.</p>
+          <input type="date" id="birthdayInput" class="form-control mb-3">
+          <button class="btn btn-accent w-100 mb-2" id="birthdaySaveBtn">Сохранить</button>
+          <button class="btn btn-ghost w-100" data-bs-dismiss="modal">Не сейчас</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= МОДАЛКА: ОЦЕНКА ЗАКАЗА ================= -->
+  <div class="modal fade" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-body text-center">
+          <h6 class="mb-1">Как вам заказ?</h6>
+          <p class="small text-muted mb-2">Ваша оценка помогает нам стать лучше</p>
+          <div id="starRow" style="font-size:36px;letter-spacing:6px;cursor:pointer;color:#FFB100">
+            <span data-star="1">☆</span><span data-star="2">☆</span><span data-star="3">☆</span><span data-star="4">☆</span><span data-star="5">☆</span>
+          </div>
+          <textarea id="reviewComment" class="form-control mt-3" rows="2" placeholder="Комментарий (по желанию)"></textarea>
+          <button class="btn btn-accent w-100 mt-3" id="reviewSubmitBtn">Отправить</button>
+          <button class="btn btn-ghost w-100 mt-2" data-bs-dismiss="modal">Закрыть</button>
         </div>
       </div>
     </div>
@@ -292,6 +362,11 @@
         <div class="modal-body">
           <div id="cartItems"></div>
 
+          <div id="upsellBox" class="hidden">
+            <div class="upsell-title">Добавить к заказу?</div>
+            <div id="upsellRow" class="upsell-row"></div>
+          </div>
+
           <hr class="my-3" style="border-color:var(--line)">
 
           <label class="form-label small fw-bold">Тип заказа</label>
@@ -303,6 +378,12 @@
           <div id="preorderBox" class="mb-2 hidden">
             <input type="datetime-local" id="preorderTime" class="form-control">
           </div>
+
+          <div id="zoneBox" class="mb-2 hidden">
+            <label class="form-label small fw-bold">Район доставки</label>
+            <select id="zoneSelect" class="form-select"></select>
+          </div>
+          <div id="deliveryNote" class="small text-muted mb-2 hidden"></div>
 
           <label class="form-label small fw-bold">Оплата</label>
           <select id="paymentMethod" class="form-select mb-2">
@@ -327,6 +408,9 @@
 
           <div id="discountRow" class="d-flex justify-content-between mt-2 text-success hidden">
             <span>Скидка по промокоду:</span><strong id="discountSum">0 ₸</strong>
+          </div>
+          <div id="deliveryRow" class="d-flex justify-content-between mt-2 hidden">
+            <span class="text-muted">Доставка:</span><strong id="deliverySum">0 ₸</strong>
           </div>
           <div class="d-flex justify-content-between mt-2 mb-1">
             <span class="text-muted">Итого к оплате:</span>
