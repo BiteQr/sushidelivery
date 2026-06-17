@@ -46,9 +46,32 @@ async function apiPost(action, payload = {}) {
 // === ИНИЦИАЛИЗАЦИЯ ======================================================
 document.addEventListener('DOMContentLoaded', init);
 
+// PWA: регистрация service worker + кнопка установки
+function setupPWA() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+  let deferredPrompt = null;
+  const btn = document.getElementById('installBtn');
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (btn) btn.classList.remove('hidden');
+  });
+  if (btn) btn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    btn.classList.add('hidden');
+  });
+  window.addEventListener('appinstalled', () => { if (btn) btn.classList.add('hidden'); });
+}
+
 async function init() {
   loadUserFromStorage();
   bindEvents();
+  setupPWA();
 
   // 1) Мгновенно показываем из локального кэша прошлой загрузки (сайт не «тупит» на обновлении)
   const cached = safeJSON(localStorage.getItem('bootstrap'));
@@ -71,6 +94,7 @@ function renderBootstrap(data) {
   state.settings = data.settings;
   state.menu = data.menu;
   state.banners = data.banners;
+  state.zones = data.zones || [];
   applyBranding(data.settings);
   showWorkStatus(data.settings);
   renderBanners();
@@ -121,7 +145,35 @@ async function refreshUser() {
   try {
     const u = await apiGet('getUser', { phone: state.user.phone });
     if (u) { state.user = u; localStorage.setItem('user', JSON.stringify(u)); updateProfileUI(); }
+    maybeAskBirthday();
   } catch (e) { /* молча */ }
+}
+
+// Спросить день рождения при возврате после заказа (один раз, если ещё не задан)
+function maybeAskBirthday() {
+  if (localStorage.getItem('askBirthday') !== '1') return;
+  if (!state.user || state.user.birthday) { localStorage.removeItem('askBirthday'); return; }
+  localStorage.removeItem('askBirthday');
+  localStorage.setItem('bdayAsked', '1');
+  setTimeout(() => { try { new bootstrap.Modal('#birthdayModal').show(); } catch (e) {} }, 700);
+}
+
+// Сохранить день рождения
+async function saveBirthday() {
+  const val = document.getElementById('birthdayInput').value; // YYYY-MM-DD
+  if (!val) return alert('Выберите дату');
+  const btn = document.getElementById('birthdaySaveBtn');
+  btn.disabled = true; const t = btn.textContent; btn.textContent = 'Сохраняем...';
+  try {
+    const u = await apiPost('saveBirthday', { phone: state.user.phone, birthday: val });
+    state.user = u; localStorage.setItem('user', JSON.stringify(u));
+    bootstrap.Modal.getInstance(document.getElementById('birthdayModal')).hide();
+    alert('Спасибо! Подарим бонусы в ваш день рождения 🎁');
+  } catch (e) {
+    alert('Ошибка: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = t;
+  }
 }
 
 // === РЕНДЕР: БАННЕР-ГЕРОЙ (статичный, переключается стрелками) ============
@@ -314,6 +366,32 @@ function renderCartItems() {
     </div>`).join('');
   box.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => changeQty(b.dataset.inc, 1));
   box.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => changeQty(b.dataset.dec, -1));
+  renderUpsell();
+}
+
+// Допродажа: позиции с меткой Upsell, которых ещё нет в корзине
+function renderUpsell() {
+  const box = document.getElementById('upsellBox');
+  const row = document.getElementById('upsellRow');
+  if (!box || !row) return;
+  const inCart = id => !!state.cart[id];
+  const items = (state.menu || []).filter(m => m.upsell && !inCart(m.id)).slice(0, 8);
+  // показываем только если в корзине что-то есть и есть что предложить
+  if (!items.length || cartTotals().count === 0) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  row.innerHTML = items.map(m => `
+    <div class="upsell-card">
+      <img src="${m.photoUrl}" loading="lazy" alt="">
+      <div class="u-body">
+        <div class="u-name">${m.name}</div>
+        <button class="u-add" data-upsell="${m.id}">+ ${m.price} ₸</button>
+      </div>
+    </div>`).join('');
+  row.querySelectorAll('[data-upsell]').forEach(b => b.onclick = () => {
+    addToCart(b.dataset.upsell);
+    renderCartItems();   // перерисует список и допродажу
+    recalcFinal();
+  });
 }
 
 // Текущая скидка по применённому промокоду (пересчитывается от суммы корзины)
@@ -344,8 +422,62 @@ function recalcFinal() {
   if (bonus > maxBonus) { bonus = maxBonus; document.getElementById('bonusInput').value = bonus; }
   document.getElementById('bonusMax').textContent = maxBonus;
 
-  // 3) Итог
-  document.getElementById('finalSum').textContent = (afterPromo - bonus) + ' ₸';
+  // 3) Доставка (по выбранному району; зависит от режима в настройках)
+  const fee = currentDeliveryFee(afterPromo);
+  const deliveryRow = document.getElementById('deliveryRow');
+  deliveryRow.classList.toggle('hidden', fee <= 0);
+  document.getElementById('deliverySum').textContent = '+' + fee + ' ₸';
+
+  // 4) Итог
+  document.getElementById('finalSum').textContent = ((afterPromo - bonus) + fee) + ' ₸';
+}
+
+// Стоимость доставки по выбранному району (0, если не доставка / другой режим / бесплатно от порога)
+function currentDeliveryFee(afterPromo) {
+  const orderType = document.getElementById('orderType').value;
+  if (orderType !== 'Доставка') return 0;
+  if ((state.settings.DeliveryMode || 'own') !== 'own') return 0;
+  const zoneName = document.getElementById('zoneSelect').value;
+  const z = (state.zones || []).find(x => x.name === zoneName);
+  if (!z) return 0;
+  if (z.freeFrom > 0 && afterPromo >= z.freeFrom) return 0;
+  return z.price;
+}
+
+// Настройка опций доставки под режим заведения
+function setupDeliveryUI() {
+  const mode = state.settings.DeliveryMode || 'own';
+  const ot = document.getElementById('orderType');
+  const delivOpt = Array.from(ot.options).find(o => o.value === 'Доставка');
+  if (delivOpt) {
+    const hide = (mode === 'pickup');
+    delivOpt.hidden = hide; delivOpt.disabled = hide;
+    if (hide && ot.value === 'Доставка') ot.value = 'Самовывоз';
+  }
+  const zsel = document.getElementById('zoneSelect');
+  if (zsel.options.length === 0 && state.zones && state.zones.length) {
+    zsel.innerHTML = state.zones.map(z =>
+      `<option value="${z.name}">${z.name}${z.price ? ' — ' + z.price + '₸' : ''}</option>`).join('');
+  }
+}
+
+function hasOrderTypeOption(val) {
+  return Array.from(document.getElementById('orderType').options).some(o => o.value === val && !o.hidden);
+}
+
+// Показать/скрыть выбор района и заметку про оплату курьеру
+function refreshDeliveryBlocks() {
+  const mode = state.settings.DeliveryMode || 'own';
+  const isDelivery = document.getElementById('orderType').value === 'Доставка';
+  const showZones = isDelivery && mode === 'own' && state.zones && state.zones.length > 0;
+  document.getElementById('zoneBox').classList.toggle('hidden', !showZones);
+  const note = document.getElementById('deliveryNote');
+  if (isDelivery && mode === 'customer') {
+    note.textContent = 'Доставку оплачиваете курьеру отдельно.';
+    note.classList.remove('hidden');
+  } else {
+    note.classList.add('hidden');
+  }
 }
 
 // Применить промокод (проверка на бэке)
@@ -387,24 +519,46 @@ function formatPhone(el) {
   el.value = r;
 }
 
+// Режим формы: 'register' (первый заказ) или 'login' (вход по телефону+PIN)
+function setAuthMode(mode) {
+  state.authMode = mode;
+  const reg = mode === 'register';
+  ['regFields', 'regFields2', 'regFields3'].forEach(id =>
+    document.getElementById(id).classList.toggle('hidden', !reg));
+  document.getElementById('authTitle').textContent = reg ? 'Первый заказ' : 'Вход';
+  document.getElementById('authRequestBtn').textContent = reg ? 'Заказать' : 'Войти';
+  document.getElementById('authPin').placeholder = reg ? 'PIN-код (по желанию)' : 'PIN-код';
+  document.getElementById('authHint').textContent = reg
+    ? 'Имя, телефон и адрес — чтобы привезти заказ. PIN можно задать для защиты бонусов.'
+    : 'Введите телефон и PIN.';
+  document.getElementById('authToggle').textContent = reg
+    ? 'Уже заказывали? Войти по телефону и PIN'
+    : 'Первый раз? Оформить первый заказ';
+}
+
 async function doRegister() {
-  const name = document.getElementById('authName').value.trim();
   const phone = document.getElementById('authPhone').value.trim();
-  const address = document.getElementById('authAddress').value.trim();
   const pin = document.getElementById('authPin').value.trim();
-  const promocode = document.getElementById('authPromo').value.trim();
-  if (!name || !phone) return alert('Введите имя и телефон');
-  if (!/^\d{4}$/.test(pin)) return alert('PIN должен состоять из 4 цифр');
+  if (!phone) return alert('Введите телефон');
+  if (pin && !/^\d{4}$/.test(pin)) return alert('PIN должен состоять из 4 цифр');
+
+  const payload = { phone: phone, pin: pin };
+  if (state.authMode === 'register') {
+    const name = document.getElementById('authName').value.trim();
+    if (!name) return alert('Введите имя');
+    payload.name = name;
+    payload.address = document.getElementById('authAddress').value.trim();
+    payload.promocode = document.getElementById('authPromo').value.trim();
+  }
 
   const btn = document.getElementById('authRequestBtn');
-  btn.disabled = true; const t = btn.textContent; btn.textContent = 'Сохраняем...';
+  btn.disabled = true; const t = btn.textContent; btn.textContent = 'Секунду...';
   try {
-    const user = await apiPost('register', { name, phone, address, pin, promocode });
+    const user = await apiPost('register', payload);
     state.user = user;
     localStorage.setItem('user', JSON.stringify(user));
     document.getElementById('newUserBanner').classList.add('hidden');
     updateProfileUI();
-    // Если в корзине есть товары — после входа сразу вернём в корзину
     const authEl = document.getElementById('authModal');
     if (cartTotals().count > 0) {
       authEl.addEventListener('hidden.bs.modal',
@@ -412,7 +566,13 @@ async function doRegister() {
     }
     bootstrap.Modal.getInstance(authEl).hide();
   } catch (e) {
-    alert('Ошибка: ' + e.message);
+    // Если в режиме «вход» оказалось, что телефон новый — мягко переключаем на регистрацию
+    if (/первого заказа/i.test(e.message) && state.authMode === 'login') {
+      setAuthMode('register');
+      alert('Похоже, вы у нас впервые — заполните имя и адрес для первого заказа.');
+    } else {
+      alert('Ошибка: ' + e.message);
+    }
   } finally {
     btn.disabled = false; btn.textContent = t;
   }
@@ -476,12 +636,15 @@ async function sendOrder() {
     name: c.item.name, qty: c.qty, price: c.item.price
   }));
   const promoCode = state.promo ? state.promo.code : '';
+  // Район доставки (только если показан выбор зон)
+  const zone = (!document.getElementById('zoneBox').classList.contains('hidden'))
+    ? document.getElementById('zoneSelect').value : '';
 
   try {
-    // 1) Сохраняем заказ на бэке (скидка, бонусы и кэшбэк считаются там же)
+    // 1) Сохраняем заказ на бэке (скидка, бонусы, кэшбэк и доставка считаются там же)
     const res = await apiPost('createOrder', {
       phone: state.user.phone, items, totalSum: sum,
-      bonusesUsed, paymentMethod: payment, orderType, requestId, promoCode,
+      bonusesUsed, paymentMethod: payment, orderType, requestId, promoCode, zone,
       preorderTime: orderType === 'Предзаказ' ? preorder : ''
     });
 
@@ -495,6 +658,8 @@ async function sendOrder() {
       `Сумма: ${sum}₸\n` +
       (res.discount ? `Скидка по промокоду ${res.promoCode}: −${res.discount}₸\n` : '') +
       (res.bonusesUsed ? `Списано бонусов: ${res.bonusesUsed}₸\n` : '') +
+      (zone ? `Район: ${zone}\n` : '') +
+      (res.deliveryFee ? `Доставка: ${res.deliveryFee}₸\n` : '') +
       `*К оплате: ${res.finalSum}₸*\n` +
       `Оплата: ${payment}\nТип: ${orderType}` +
       (orderType === 'Предзаказ' && preorder ? `\nВремя: ${preorder.replace('T', ' ')}` : '');
@@ -510,6 +675,11 @@ async function sendOrder() {
     localStorage.setItem('user', JSON.stringify(state.user));
     updateCartUI(); updateProfileUI();
     bootstrap.Modal.getInstance(document.getElementById('cartModal')).hide();
+
+    // Спросить день рождения при возврате в приложение (один раз, если ещё не задан)
+    if (state.user && !state.user.birthday && !localStorage.getItem('bdayAsked')) {
+      localStorage.setItem('askBirthday', '1');
+    }
 
     // 4) Переходим в WhatsApp. Именно переход (location), а не window.open —
     //    иначе мобильные браузеры блокируют открытие после ожидания ответа сервера.
@@ -561,6 +731,19 @@ async function loadOrders() {
               ? `<div class="small mt-1" style="color:#1FAA53"><i class="bi bi-coin"></i> Начислен кэшбэк +${o.bonusesAccrued} ₸</div>`
               : `<div class="small mt-1 text-muted"><i class="bi bi-coin"></i> Кэшбэк +${o.bonusesAccrued} ₸ после доставки</div>`)
           : '';
+        const deliveryLine = o.deliveryFee > 0
+          ? `<div class="small text-muted"><i class="bi bi-truck"></i> Доставка${o.zone ? ' (' + o.zone + ')' : ''}: +${o.deliveryFee} ₸</div>` : '';
+        const payable = o.totalSum - o.bonusesUsed - (o.discount || 0) + (o.deliveryFee || 0);
+        // Отмена: «Новый» — сам; «Готовится»/«В пути» — через заведение; иначе нельзя
+        const cancelCtl = st === 'Новый'
+          ? `<button class="btn btn-ghost btn-sm" style="color:#E2492F" data-cancel="${o.orderId}">Отменить</button>`
+          : ((st === 'Готовится' || st === 'В пути')
+              ? `<a class="btn btn-ghost btn-sm" style="color:#E2492F" target="_blank" href="https://wa.me/${state.settings.AdminWhatsApp}?text=${encodeURIComponent('Здравствуйте, хочу отменить заказ ' + o.orderId)}">Отменить</a>`
+              : '');
+        const reviewed = isReviewed(o.orderId);
+        const reviewCtl = (st === 'Доставлен' && !reviewed)
+          ? `<button class="btn btn-sm" style="background:#FFB100;color:#1c1c1e;font-weight:700" data-review="${o.orderId}"><i class="bi bi-star-fill"></i> Оценить</button>`
+          : (st === 'Доставлен' && reviewed ? `<span class="small text-muted">Спасибо за оценку</span>` : '');
         return `
         <div class="order-card">
           <div class="d-flex justify-content-between align-items-center mb-1">
@@ -569,17 +752,26 @@ async function loadOrders() {
           </div>
           <small class="text-muted">${new Date(o.dateTime).toLocaleString('ru-RU')} · ${o.orderType}</small>
           <div class="small mt-2 mb-2" style="white-space:pre-line">${o.items}</div>
+          ${deliveryLine}
           ${timeInfo}
           ${cashback}
           <div class="d-flex justify-content-between align-items-center mt-2">
-            <strong>${o.totalSum - o.bonusesUsed - (o.discount || 0)} ₸</strong>
-            <button class="btn btn-ghost btn-sm" data-repeat="${idx}"><i class="bi bi-arrow-repeat"></i> Повторить</button>
+            <strong>${payable} ₸</strong>
+            <div class="d-flex align-items-center" style="gap:8px">
+              ${reviewCtl}
+              ${cancelCtl}
+              <button class="btn btn-ghost btn-sm" data-repeat="${idx}"><i class="bi bi-arrow-repeat"></i> Повторить</button>
+            </div>
           </div>
         </div>`; }).join('');
     box.innerHTML = refBlock + ordersHtml;
     bindReferralButtons();
     document.querySelectorAll('[data-repeat]').forEach(b =>
       b.addEventListener('click', () => repeatOrder(Number(b.dataset.repeat))));
+    document.querySelectorAll('[data-cancel]').forEach(b =>
+      b.addEventListener('click', () => cancelOrderClient(b.dataset.cancel)));
+    document.querySelectorAll('[data-review]').forEach(b =>
+      b.addEventListener('click', () => openReview(b.dataset.review)));
   } catch (e) {
     box.innerHTML = refBlock + '<p class="text-danger">Ошибка: ' + e.message + '</p>';
     bindReferralButtons();
@@ -598,6 +790,62 @@ function bindReferralButtons() {
     const text = `Заказывай вкусно! Введи мой промокод ${code} при регистрации 🎁`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
+}
+
+// === ОЦЕНКА ЗАКАЗА ======================================================
+function reviewedKey() { return 'reviewed_' + (state.user ? state.user.phone : ''); }
+function reviewedSet() { try { return new Set(JSON.parse(localStorage.getItem(reviewedKey()) || '[]')); } catch (e) { return new Set(); } }
+function isReviewed(orderId) { return reviewedSet().has(orderId); }
+function markReviewed(orderId) {
+  const s = reviewedSet(); s.add(orderId);
+  localStorage.setItem(reviewedKey(), JSON.stringify([...s]));
+}
+
+let _reviewOrderId = null, _reviewRating = 0;
+function openReview(orderId) {
+  _reviewOrderId = orderId; _reviewRating = 0;
+  paintStars(0);
+  document.getElementById('reviewComment').value = '';
+  new bootstrap.Modal('#reviewModal').show();
+}
+function paintStars(n) {
+  document.querySelectorAll('#starRow [data-star]').forEach(s => {
+    s.textContent = Number(s.dataset.star) <= n ? '★' : '☆';
+  });
+}
+async function submitReview() {
+  if (!_reviewRating) return alert('Поставьте оценку');
+  const comment = document.getElementById('reviewComment').value.trim();
+  const btn = document.getElementById('reviewSubmitBtn');
+  btn.disabled = true; const t = btn.textContent; btn.textContent = 'Отправляем...';
+  try {
+    await apiPost('saveReview', { phone: state.user.phone, orderId: _reviewOrderId, rating: _reviewRating, comment });
+    markReviewed(_reviewOrderId);
+    bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide();
+    // 4-5 звёзд → ведём оставить публичный отзыв (2ГИС/Google), если ссылка задана
+    if (_reviewRating >= 4 && state.settings.ReviewUrl) {
+      window.open(state.settings.ReviewUrl, '_blank');
+    } else {
+      alert('Спасибо за отзыв! Мы учтём.');
+    }
+    loadOrders();
+  } catch (e) {
+    alert('Ошибка: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = t;
+  }
+}
+
+// Отмена заказа клиентом (разрешена на бэке только для статуса «Новый»)
+async function cancelOrderClient(orderId) {
+  if (!confirm('Отменить заказ ' + orderId + '? Списанные бонусы вернутся на счёт.')) return;
+  try {
+    await apiPost('cancelOrder', { phone: state.user.phone, orderId: orderId });
+    await refreshUser(); // баланс мог измениться (возврат бонусов)
+    loadOrders();
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 // Повторить прошлый заказ — кладёт его позиции обратно в корзину
@@ -644,8 +892,25 @@ function bindEvents() {
     } else new bootstrap.Modal('#authModal').show();
   });
 
-  // авторизация (один шаг)
+  // авторизация
   document.getElementById('authRequestBtn').addEventListener('click', doRegister);
+
+  // переключатель режимов вход / первый заказ
+  document.getElementById('authToggle').addEventListener('click', e => {
+    e.preventDefault();
+    setAuthMode(state.authMode === 'register' ? 'login' : 'register');
+  });
+
+  // при открытии формы — режим по умолчанию «первый заказ»
+  document.getElementById('authModal').addEventListener('show.bs.modal', () => setAuthMode('register'));
+
+  // сохранение дня рождения
+  document.getElementById('birthdaySaveBtn').addEventListener('click', saveBirthday);
+
+  // оценка заказа: выбор звёзд + отправка
+  document.querySelectorAll('#starRow [data-star]').forEach(s =>
+    s.addEventListener('click', () => { _reviewRating = Number(s.dataset.star); paintStars(_reviewRating); }));
+  document.getElementById('reviewSubmitBtn').addEventListener('click', submitReview);
 
   // телефон: всегда начинается с +7, пользователь дописывает остальное
   const phoneEl = document.getElementById('authPhone');
@@ -655,14 +920,17 @@ function bindEvents() {
   // корзина: открытие модалки
   document.getElementById('cartModal').addEventListener('show.bs.modal', () => {
     renderCartItems();
+    // режим доставки: настраиваем опции типа заказа
+    setupDeliveryUI();
     // подставляем прошлые предпочтения (тип заказа и оплату)
     try {
       const prefs = JSON.parse(localStorage.getItem('prefs') || '{}');
-      if (prefs.orderType) document.getElementById('orderType').value = prefs.orderType;
+      if (prefs.orderType && hasOrderTypeOption(prefs.orderType)) document.getElementById('orderType').value = prefs.orderType;
       if (prefs.payment) document.getElementById('paymentMethod').value = prefs.payment;
     } catch (e) {}
     document.getElementById('preorderBox').classList.toggle('hidden',
       document.getElementById('orderType').value !== 'Предзаказ');
+    refreshDeliveryBlocks();
     // показать блок бонусов, если есть баланс
     const hasBonus = state.user && state.user.bonusBalance > 0;
     document.getElementById('bonusBox').classList.toggle('hidden', !hasBonus);
@@ -670,9 +938,13 @@ function bindEvents() {
     recalcFinal();
   });
 
-  // тип заказа -> показать выбор времени для предзаказа
-  document.getElementById('orderType').addEventListener('change', e =>
-    document.getElementById('preorderBox').classList.toggle('hidden', e.target.value !== 'Предзаказ'));
+  // тип заказа -> показать предзаказ/доставку
+  document.getElementById('orderType').addEventListener('change', e => {
+    document.getElementById('preorderBox').classList.toggle('hidden', e.target.value !== 'Предзаказ');
+    refreshDeliveryBlocks();
+    recalcFinal();
+  });
+  document.getElementById('zoneSelect').addEventListener('change', recalcFinal);
 
   // ввод бонусов -> пересчёт
   document.getElementById('bonusInput').addEventListener('input', recalcFinal);
