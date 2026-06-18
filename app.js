@@ -46,17 +46,33 @@ async function apiPost(action, payload = {}) {
 // === ИНИЦИАЛИЗАЦИЯ ======================================================
 document.addEventListener('DOMContentLoaded', init);
 
-// PWA: регистрация service worker + кнопка установки
+// PWA: регистрация service worker + установка (только при первом заходе)
 function setupPWA() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
+
+  const firstVisit = !localStorage.getItem('visited');
+  localStorage.setItem('visited', '1');
+
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isStandalone) return; // уже установлено — ничего не показываем
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  // iOS не поддерживает авто-кнопку установки — показываем подсказку (только новичкам)
+  if (isIOS) {
+    if (firstVisit) setTimeout(showIosInstallHint, 2500);
+    return;
+  }
+
+  // Android/desktop — нативная установка через beforeinstallprompt (только новичкам)
   let deferredPrompt = null;
   const btn = document.getElementById('installBtn');
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     deferredPrompt = e;
-    if (btn) btn.classList.remove('hidden');
+    if (btn && firstVisit) btn.classList.remove('hidden');
   });
   if (btn) btn.addEventListener('click', async () => {
     if (!deferredPrompt) return;
@@ -66,6 +82,12 @@ function setupPWA() {
     btn.classList.add('hidden');
   });
   window.addEventListener('appinstalled', () => { if (btn) btn.classList.add('hidden'); });
+}
+
+// Подсказка для iPhone: как поставить приложение на экран «Домой»
+function showIosInstallHint() {
+  const el = document.getElementById('iosInstall');
+  if (el) el.classList.remove('hidden');
 }
 
 async function init() {
@@ -180,9 +202,10 @@ async function saveBirthday() {
 function renderBanners() {
   const box = document.getElementById('bannerScroll');
   if (!state.banners.length) { box.innerHTML = ''; return; }
+  if (state._bannerAutoTimer) { clearTimeout(state._bannerAutoTimer); state._bannerAutoTimer = null; }
   state.bannerIndex = 0;
   box.innerHTML = `
-    <div class="hero">
+    <div class="hero" id="heroBox">
       <div class="hero__img" id="heroImg"></div>
       <button class="hero__arrow hero__arrow--prev" id="heroPrev" aria-label="Назад"><i class="bi bi-chevron-left"></i></button>
       <button class="hero__arrow hero__arrow--next" id="heroNext" aria-label="Вперёд"><i class="bi bi-chevron-right"></i></button>
@@ -193,15 +216,46 @@ function renderBanners() {
   const multi = state.banners.length > 1;
   document.getElementById('heroPrev').classList.toggle('hidden', !multi);
   document.getElementById('heroNext').classList.toggle('hidden', !multi);
-  document.getElementById('heroPrev').onclick = e => { e.stopPropagation(); changeBanner(-1); };
-  document.getElementById('heroNext').onclick = e => { e.stopPropagation(); changeBanner(1); };
+  document.getElementById('heroPrev').onclick = e => { e.stopPropagation(); userChangeBanner(-1); };
+  document.getElementById('heroNext').onclick = e => { e.stopPropagation(); userChangeBanner(1); };
+
+  // Свайп пальцем по баннеру
+  if (multi) bindBannerSwipe(document.getElementById('heroBox'));
   renderHero();
+
+  // Авто-показ второго баннера на старте (плавно), чтобы человек понял, что их несколько.
+  // Останавливается, как только пользователь сам взаимодействует.
+  if (multi) state._bannerAutoTimer = setTimeout(() => changeBanner(1), 1800);
+}
+
+// Свайп влево/вправо по баннеру
+function bindBannerSwipe(el) {
+  if (!el) return;
+  let x0 = null;
+  el.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  el.addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 40) userChangeBanner(dx < 0 ? 1 : -1);
+    x0 = null;
+  }, { passive: true });
+}
+
+// Смена по действию пользователя — отключает авто-показ
+function userChangeBanner(dir) {
+  if (state._bannerAutoTimer) { clearTimeout(state._bannerAutoTimer); state._bannerAutoTimer = null; }
+  changeBanner(dir);
 }
 
 function changeBanner(dir) {
   const n = state.banners.length;
   state.bannerIndex = (state.bannerIndex + dir + n) % n;
-  renderHero();
+  const img = document.getElementById('heroImg');
+  if (!img) { renderHero(); return; }
+  // плавная смена (затухание)
+  img.style.transition = 'opacity .25s ease';
+  img.style.opacity = '0';
+  setTimeout(() => { renderHero(); img.style.opacity = '1'; }, 200);
 }
 
 function renderHero() {
