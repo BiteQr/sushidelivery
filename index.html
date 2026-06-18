@@ -134,17 +134,17 @@
     .price-pill{ align-self:flex-start; margin-top:auto; background:var(--accent); color:#fff;
       font-weight:700; font-size:14px; padding:6px 16px; border-radius:999px; line-height:1.2; }
 
-    /* Допродажа в корзине */
-    .upsell-title{ font-weight:700; font-size:14px; margin:14px 0 8px; }
-    .upsell-row{ display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch; }
-    .upsell-card{ flex:0 0 120px; background:#fff; border:1px solid var(--line); border-radius:14px;
+    /* Допродажа в корзине (компактно) */
+    .upsell-title{ font-weight:700; font-size:13px; margin:10px 0 6px; }
+    .upsell-row{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; }
+    .upsell-card{ flex:0 0 88px; background:#fff; border:1px solid var(--line); border-radius:12px;
       overflow:hidden; display:flex; flex-direction:column; }
-    .upsell-card img{ width:100%; height:80px; object-fit:cover; display:block; }
-    .upsell-card .u-body{ padding:7px 9px 9px; display:flex; flex-direction:column; gap:3px; flex:1; }
-    .upsell-card .u-name{ font-size:12.5px; font-weight:600; line-height:1.2;
-      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:30px; }
+    .upsell-card img{ width:100%; height:48px; object-fit:cover; display:block; }
+    .upsell-card .u-body{ padding:5px 6px 6px; display:flex; flex-direction:column; gap:3px; flex:1; }
+    .upsell-card .u-name{ font-size:11px; font-weight:600; line-height:1.2;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .upsell-card .u-add{ margin-top:auto; border:none; background:var(--accent); color:#fff;
-      font-weight:700; font-size:12.5px; border-radius:999px; padding:5px 0; cursor:pointer; }
+      font-weight:700; font-size:11px; border-radius:999px; padding:4px 0; cursor:pointer; }
     .upsell-card .u-add:active{ background:var(--accent-press); }
 
     /* ---------- Большая карточка (метка BigCard=TRUE) ---------- */
@@ -367,7 +367,7 @@
 
   <!-- ================= МОДАЛКА: КОРЗИНА ================= -->
   <div class="modal fade" id="cartModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header"><h6 class="modal-title">Корзина</h6>
           <button class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -423,6 +423,9 @@
           </div>
           <div id="deliveryRow" class="d-flex justify-content-between mt-2 hidden">
             <span class="text-muted">Доставка:</span><strong id="deliverySum">0 ₸</strong>
+          </div>
+          <div id="serviceRow" class="d-flex justify-content-between mt-2 hidden">
+            <span class="text-muted">Сервисный сбор:</span><strong id="serviceSum">0 ₸</strong>
           </div>
           <div class="d-flex justify-content-between mt-2 mb-1">
             <span class="text-muted">Итого к оплате:</span>
