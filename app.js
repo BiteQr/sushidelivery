@@ -306,15 +306,18 @@ function renderMenu() {
 
   document.getElementById('menuList').innerHTML = list.map(m => {
     const html = m.bigCard ? bigCardHtml(m) : regularCardHtml(m);
-    // Подменяем плейсхолдер кнопки/инкрементора на нужное
+    // Подменяем плейсхолдер кнопки/инкрементора на нужное (у стоп-позиций кнопки нет)
     const qty = state.cart[m.id]?.qty || 0;
-    const btnHtml = qty === 0
-      ? `<button class="dish__add" data-add="${m.id}" aria-label="Добавить"><i class="bi bi-plus-lg"></i></button>`
-      : `<div class="dish__counter">
-          <button data-minus="${m.id}">−</button>
-          <span>${qty}</span>
-          <button data-plus="${m.id}">+</button>
-        </div>`;
+    let btnHtml = '';
+    if (!m.inStop) {
+      btnHtml = qty === 0
+        ? `<button class="dish__add" data-add="${m.id}" aria-label="Добавить"><i class="bi bi-plus-lg"></i></button>`
+        : `<div class="dish__counter">
+            <button data-minus="${m.id}">−</button>
+            <span>${qty}</span>
+            <button data-plus="${m.id}">+</button>
+          </div>`;
+    }
     return html.replace('<!-- BTN -->', btnHtml);
   }).join('');
 
@@ -338,33 +341,39 @@ function renderMenu() {
 
 // Обычная карточка: фото сверху, под ним название, описание, цена-пилюля
 function regularCardHtml(m) {
+  const pill = m.inStop
+    ? `<div class="price-pill price-pill--out">Разобрали</div>`
+    : `<div class="price-pill">${m.price} ₸</div>`;
   return `
-    <article class="dish">
+    <article class="dish ${m.inStop ? 'dish--out' : ''}">
       <div class="dish__media">
         <img src="${m.photoUrl}" loading="lazy" decoding="async" alt="">
-        ${m.tags.length ? `<div class="dish__tags">${m.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+        ${m.tags.length && !m.inStop ? `<div class="dish__tags">${m.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
         <!-- BTN -->
       </div>
       <div class="dish__body">
         <h3 class="dish__name">${m.name}</h3>
         <p class="dish__desc">${m.description || ''}</p>
-        <div class="price-pill">${m.price} ₸</div>
+        ${pill}
       </div>
     </article>`;
 }
 
 // Большая карточка (метка BigCard): название оранжевым капсом, описание, пилюля — сверху; крупное фото — снизу
 function bigCardHtml(m) {
+  const pill = m.inStop
+    ? `<div class="price-pill price-pill--out">Разобрали</div>`
+    : `<div class="price-pill">${m.price} ₸</div>`;
   return `
-    <article class="dish dish--big">
+    <article class="dish dish--big ${m.inStop ? 'dish--out' : ''}">
       <div class="dish__head">
         <h3 class="dish__name">${m.name}</h3>
         <p class="dish__desc">${m.description || ''}</p>
-        <div class="price-pill">${m.price} ₸</div>
+        ${pill}
       </div>
       <div class="dish__media">
         <img src="${m.photoUrl}" loading="lazy" decoding="async" alt="">
-        ${m.tags.length ? `<div class="dish__tags">${m.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+        ${m.tags.length && !m.inStop ? `<div class="dish__tags">${m.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
         <!-- BTN -->
       </div>
     </article>`;
@@ -374,6 +383,7 @@ function bigCardHtml(m) {
 function addToCart(id) {
   const item = state.menu.find(m => String(m.id) === String(id));
   if (!item) return;
+  if (item.inStop) return; // позиция в стоп-листе — не добавляем
   if (!state.cart[id]) state.cart[id] = { item, qty: 0 };
   state.cart[id].qty++;
   updateCartUI();
@@ -429,7 +439,7 @@ function renderUpsell() {
   const row = document.getElementById('upsellRow');
   if (!box || !row) return;
   const inCart = id => !!state.cart[id];
-  const items = (state.menu || []).filter(m => m.upsell && !inCart(m.id)).slice(0, 4);
+  const items = (state.menu || []).filter(m => m.upsell && !m.inStop && !inCart(m.id)).slice(0, 4);
   // показываем только если в корзине что-то есть и есть что предложить
   if (!items.length || cartTotals().count === 0) { box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
