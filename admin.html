@@ -137,6 +137,14 @@
           <label>Реферал. срок, дней (0 = без ограничения)</label><input id="cfgRefDays" class="inp" type="number">
           <label>Бонус на день рождения (₸, 0 = выкл)</label><input id="cfgBdayBonus" class="inp" type="number">
           <label>Ссылка для отзыва (2ГИС/Google) — для оценок 4-5</label><input id="cfgReviewUrl" class="inp" placeholder="https://2gis.kz/...">
+          <label>Сервисный сбор</label>
+          <div class="row2">
+            <select id="cfgServiceType" class="inp">
+              <option value="fixed">Фикс. сумма (₸)</option>
+              <option value="percent">Процент (%)</option>
+            </select>
+            <input id="cfgServiceValue" class="inp" type="number" placeholder="0 = выкл">
+          </div>
           <button class="btn btn-accent" id="saveConfig" style="width:100%;margin-top:14px">Сохранить настройки</button>
           <div id="cfgMsg" class="muted" style="margin-top:8px"></div>
         </div>
@@ -444,6 +452,8 @@
         cfgRefDays.value = c.ReferralDays;
         cfgBdayBonus.value = c.BirthdayBonus;
         cfgReviewUrl.value = c.ReviewUrl || '';
+        cfgServiceType.value = c.ServiceFeeType || 'fixed';
+        cfgServiceValue.value = c.ServiceFeeValue || 0;
       } catch (e) { alert(e.message); }
     }
     document.getElementById('saveConfig').onclick = async () => {
@@ -458,7 +468,8 @@
           WelcomeBonus: Number(cfgWelcome.value), CashbackPercent: Number(cfgCashback.value),
           MaxBonusSpendPercent: Number(cfgMaxSpend.value), ReferralPercent: Number(cfgRefPct.value),
           ReferralDays: Number(cfgRefDays.value), BirthdayBonus: Number(cfgBdayBonus.value),
-          ReviewUrl: cfgReviewUrl.value.trim()
+          ReviewUrl: cfgReviewUrl.value.trim(),
+          ServiceFeeType: cfgServiceType.value, ServiceFeeValue: Number(cfgServiceValue.value) || 0
         });
         msg.style.color = 'var(--wa)'; msg.textContent = 'Сохранено \u2713';
       } catch (e) { msg.style.color = 'var(--accent2)'; msg.textContent = e.message; }
