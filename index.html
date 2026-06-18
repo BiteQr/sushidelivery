@@ -271,6 +271,18 @@
     <i class="bi bi-download"></i> Установить приложение
   </button>
 
+  <!-- Подсказка установки для iPhone (Safari не даёт авто-кнопку) -->
+  <div id="iosInstall" class="hidden"
+    style="position:fixed;left:12px;right:12px;bottom:74px;z-index:1041;background:#fff;border:1px solid var(--line);
+           border-radius:16px;padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.18);display:flex;align-items:center;gap:10px">
+    <img src="icon-192.png" style="width:42px;height:42px;border-radius:10px">
+    <div style="flex:1;font-size:13px;line-height:1.35">
+      Установите приложение: нажмите <i class="bi bi-box-arrow-up"></i> <b>Поделиться</b>, затем <b>«На экран Домой»</b>.
+    </div>
+    <button onclick="document.getElementById('iosInstall').classList.add('hidden')"
+      style="border:none;background:transparent;font-size:20px;color:#999;line-height:1">&times;</button>
+  </div>
+
   <!-- ================= НИЖНЕЕ МЕНЮ ================= -->
   <nav class="navbar-bottom">
     <div class="container d-flex">
