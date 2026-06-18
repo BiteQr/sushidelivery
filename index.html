@@ -133,6 +133,12 @@
     /* Цена-пилюля (на всех карточках) */
     .price-pill{ align-self:flex-start; margin-top:auto; background:var(--accent); color:#fff;
       font-weight:700; font-size:14px; padding:6px 16px; border-radius:999px; line-height:1.2; }
+    .price-pill--out{ background:#C9C9CE; color:#fff; }
+
+    /* Стоп-лист: позиция серая, без действия */
+    .dish--out{ opacity:.6; }
+    .dish--out .dish__media img{ filter:grayscale(1); }
+    .dish--out .dish__name{ color:#8A8A8E; }
 
     /* Допродажа в корзине (компактно) */
     .upsell-title{ font-weight:700; font-size:13px; margin:10px 0 6px; }
