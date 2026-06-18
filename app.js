@@ -429,7 +429,7 @@ function renderUpsell() {
   const row = document.getElementById('upsellRow');
   if (!box || !row) return;
   const inCart = id => !!state.cart[id];
-  const items = (state.menu || []).filter(m => m.upsell && !inCart(m.id)).slice(0, 8);
+  const items = (state.menu || []).filter(m => m.upsell && !inCart(m.id)).slice(0, 4);
   // показываем только если в корзине что-то есть и есть что предложить
   if (!items.length || cartTotals().count === 0) { box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
@@ -482,8 +482,22 @@ function recalcFinal() {
   deliveryRow.classList.toggle('hidden', fee <= 0);
   document.getElementById('deliverySum').textContent = '+' + fee + ' ₸';
 
+  // 3b) Сервисный сбор
+  const service = currentServiceFee(afterPromo);
+  const serviceRow = document.getElementById('serviceRow');
+  serviceRow.classList.toggle('hidden', service <= 0);
+  document.getElementById('serviceSum').textContent = '+' + service + ' ₸';
+
   // 4) Итог
-  document.getElementById('finalSum').textContent = ((afterPromo - bonus) + fee) + ' ₸';
+  document.getElementById('finalSum').textContent = ((afterPromo - bonus) + fee + service) + ' ₸';
+}
+
+// Сервисный сбор по настройкам (фикс или процент от еды)
+function currentServiceFee(afterPromo) {
+  const val = Number(state.settings.ServiceFeeValue) || 0;
+  if (val <= 0) return 0;
+  if ((state.settings.ServiceFeeType || 'fixed') === 'percent') return Math.round(afterPromo * val / 100);
+  return Math.round(val);
 }
 
 // Стоимость доставки по выбранному району (0, если не доставка / другой режим / бесплатно от порога)
@@ -714,6 +728,7 @@ async function sendOrder() {
       (res.bonusesUsed ? `Списано бонусов: ${res.bonusesUsed}₸\n` : '') +
       (zone ? `Район: ${zone}\n` : '') +
       (res.deliveryFee ? `Доставка: ${res.deliveryFee}₸\n` : '') +
+      (res.serviceFee ? `Сервисный сбор: ${res.serviceFee}₸\n` : '') +
       `*К оплате: ${res.finalSum}₸*\n` +
       `Оплата: ${payment}\nТип: ${orderType}` +
       (orderType === 'Предзаказ' && preorder ? `\nВремя: ${preorder.replace('T', ' ')}` : '');
@@ -787,7 +802,9 @@ async function loadOrders() {
           : '';
         const deliveryLine = o.deliveryFee > 0
           ? `<div class="small text-muted"><i class="bi bi-truck"></i> Доставка${o.zone ? ' (' + o.zone + ')' : ''}: +${o.deliveryFee} ₸</div>` : '';
-        const payable = o.totalSum - o.bonusesUsed - (o.discount || 0) + (o.deliveryFee || 0);
+        const serviceLine = o.serviceFee > 0
+          ? `<div class="small text-muted"><i class="bi bi-receipt"></i> Сервисный сбор: +${o.serviceFee} ₸</div>` : '';
+        const payable = o.totalSum - o.bonusesUsed - (o.discount || 0) + (o.deliveryFee || 0) + (o.serviceFee || 0);
         // Отмена: «Новый» — сам; «Готовится»/«В пути» — через заведение; иначе нельзя
         const cancelCtl = st === 'Новый'
           ? `<button class="btn btn-ghost btn-sm" style="color:#E2492F" data-cancel="${o.orderId}">Отменить</button>`
@@ -807,6 +824,7 @@ async function loadOrders() {
           <small class="text-muted">${new Date(o.dateTime).toLocaleString('ru-RU')} · ${o.orderType}</small>
           <div class="small mt-2 mb-2" style="white-space:pre-line">${o.items}</div>
           ${deliveryLine}
+          ${serviceLine}
           ${timeInfo}
           ${cashback}
           <div class="d-flex justify-content-between align-items-center mt-2">
